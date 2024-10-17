@@ -324,8 +324,8 @@ publishing {
             name = "IzzelAliz"
             url = uri('http://189.189.1.80:8080/' + (project.version.toString().endsWith('SNAPSHOT') ? 'snapshots' : 'releases'))
             credentials {
-                username = project.findProperty("30") ?: System.getenv("ARCLIGHT_USER")
-                password = project.findProperty("5o3orVxXlhBEZNb0/xtiKpcuscxkhljXitN6ZEPgh2mkFTW2MJOSlACZzk3cEb/Z") ?: System.getenv("ARCLIGHT_TOKEN")
+                username = project.findProperty("mavenUser") ?: System.getenv("ARCLIGHT_USER")
+                password = project.findProperty("mavenToken") ?: System.getenv("ARCLIGHT_TOKEN")
             }
         }
     }
