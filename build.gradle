@@ -40,6 +40,7 @@ allprojects {
         maven { url = 'https://files.minecraftforge.net/maven/' }
         maven { url = 'http://201.106.6.46:8080/#/releases' }
         maven { url = 'https://jitpack.io/' }
+        allowInsecureProtocol = true
         mavenCentral()
     }
 

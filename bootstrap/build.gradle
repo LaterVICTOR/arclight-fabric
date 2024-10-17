@@ -50,6 +50,7 @@ repositories {
     maven { url = 'https://maven.neoforged.net/releases/' }
     maven { url = 'http://201.106.6.46:8080/#/releases' }
     maven { url = 'https://jitpack.io/' }
+    allowInsecureProtocol = true
     mavenCentral()
 }
 
