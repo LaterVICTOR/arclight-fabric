@@ -48,7 +48,7 @@ repositories {
     maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
     maven { url = 'https://files.minecraftforge.net/maven/' }
     maven { url = 'https://maven.neoforged.net/releases/' }
-    maven { url = 'http://189.189.1.80:8080/releases' }
+    maven { url = 'http://201.106.6.46:8080/releases' }
     maven { url = 'https://jitpack.io/' }
     mavenCentral()
 }
@@ -322,7 +322,7 @@ publishing {
     repositories {
         maven {
             name = "IzzelAliz"
-            url = uri('http://189.189.1.80:8080/' + (project.version.toString().endsWith('SNAPSHOT') ? 'snapshots' : 'releases'))
+            url = uri('http://201.106.6.46:8080/' + (project.version.toString().endsWith('SNAPSHOT') ? 'snapshots' : 'releases'))
             credentials {
                 username = project.findProperty("mavenUser") ?: System.getenv("ARCLIGHT_USER")
                 password = project.findProperty("mavenToken") ?: System.getenv("ARCLIGHT_TOKEN")

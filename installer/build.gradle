@@ -8,7 +8,7 @@ repositories {
         name = 'sponge'
         url = 'https://repo.spongepowered.org/maven'
     }
-    maven { url = 'http://189.189.1.80:8080/releases' }
+    maven { url = 'http://201.106.6.46:8080/releases' }
 }
 
 dependencies {
