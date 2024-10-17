@@ -48,7 +48,7 @@ repositories {
     maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
     maven { url = 'https://files.minecraftforge.net/maven/' }
     maven { url = 'https://maven.neoforged.net/releases/' }
-    maven { url = 'https://maven.izzel.io/releases' }
+    maven { url = 'http://189.189.1.80:8080/releases' }
     maven { url = 'https://jitpack.io/' }
     mavenCentral()
 }
@@ -327,6 +327,14 @@ publishing {
                 username = project.findProperty("30") ?: System.getenv("ARCLIGHT_USER")
                 password = project.findProperty("5o3orVxXlhBEZNb0/xtiKpcuscxkhljXitN6ZEPgh2mkFTW2MJOSlACZzk3cEb/Z") ?: System.getenv("ARCLIGHT_TOKEN")
             }
+        }
+    }
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = 'arclight-forge-' + versionName
+            artifact project(':arclight-forge').tasks.srgJar
+            artifact project(':arclight-forge').tasks.spigotJar
+            artifact project(':arclight-forge').tasks.sourcesJar
         }
     }
 }

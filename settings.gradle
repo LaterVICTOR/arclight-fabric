@@ -14,6 +14,7 @@ include 'i18n-config'
 
 include 'arclight-common'
 
+include 'arclight-forge'
 include 'arclight-fabric'
 
 include 'bootstrap'
