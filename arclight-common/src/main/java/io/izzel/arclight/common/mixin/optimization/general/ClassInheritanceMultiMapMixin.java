@@ -1,7 +1,5 @@
 package io.izzel.arclight.common.mixin.optimization.general;
 
-import io.izzel.arclight.common.mod.compat.ModIds;
-import io.izzel.arclight.common.mod.mixins.annotation.LoadIfMod;
 import net.minecraft.util.ClassInstanceMultiMap;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 
 @Mixin(ClassInstanceMultiMap.class)
-@LoadIfMod(modid = {ModIds.LITHIUM, ModIds.CANARY, ModIds.RADIUM}, condition = LoadIfMod.ModCondition.ABSENT)
 public class ClassInheritanceMultiMapMixin<T> {
 
     // @formatter:off
@@ -50,7 +47,7 @@ public class ClassInheritanceMultiMapMixin<T> {
      * @author IzzelAliz
      * @reason
      */
-    @Overwrite(remap = false)
+    @Overwrite
     public boolean add(T p_add_1_) {
         if (byClass != null) {
             boolean flag = false;
@@ -75,7 +72,7 @@ public class ClassInheritanceMultiMapMixin<T> {
      * @author IzzelAliz
      * @reason
      */
-    @Overwrite(remap = false)
+    @Overwrite
     public boolean remove(Object p_remove_1_) {
         if (byClass == null) return false;
         boolean flag = false;
@@ -94,7 +91,7 @@ public class ClassInheritanceMultiMapMixin<T> {
      * @author IzzelAliz
      * @reason
      */
-    @Overwrite(remap = false)
+    @Overwrite
     public boolean contains(Object p_contains_1_) {
         return byClass != null && this.find(p_contains_1_.getClass()).contains(p_contains_1_);
     }

@@ -11,6 +11,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
+import org.bukkit.event.entity.HorseJumpEvent;
 import org.bukkit.inventory.InventoryHolder;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -30,7 +31,7 @@ public abstract class AbstractHorseMixin extends AnimalMixin {
         this.maxDomestication = 100;
     }
 
-    @Redirect(method = "createInventory", at = @At(value = "NEW", target = "(I)Lnet/minecraft/world/SimpleContainer;"))
+    @Redirect(method = "createInventory", at = @At(value = "NEW", target = "net/minecraft/world/SimpleContainer"))
     private SimpleContainer arclight$createInv(int slots) {
         SimpleContainer inventory = new SimpleContainer(slots);
         ((IInventoryBridge) inventory).setOwner((InventoryHolder) this.getBukkitEntity());
@@ -67,7 +68,8 @@ public abstract class AbstractHorseMixin extends AnimalMixin {
         } else {
             power = 0.4F + 0.4F * (float) i / 90.0F;
         }
-        if (!CraftEventFactory.callHorseJumpEvent((AbstractHorse) (Object) this, power)) {
+        HorseJumpEvent event = CraftEventFactory.callHorseJumpEvent((AbstractHorse) (Object) this, power);
+        if (event.isCancelled()) {
             ci.cancel();
         }
     }

@@ -8,10 +8,8 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.decoration.LeashFenceKnotEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.AABB;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 
@@ -27,12 +25,12 @@ public abstract class LeashFenceKnotEntityMixin extends HangingEntityMixin {
     @SuppressWarnings("ConstantConditions")
     @Overwrite
     public InteractionResult interact(final Player entityhuman, final InteractionHand enumhand) {
-        if (this.level().isClientSide) {
+        if (this.level.isClientSide) {
             return InteractionResult.SUCCESS;
         }
         boolean flag = false;
         final double d0 = 7.0;
-        final List<Mob> list = this.level().getEntitiesOfClass(Mob.class, new AABB(this.getX() - 7.0, this.getY() - 7.0, this.getZ() - 7.0, this.getX() + 7.0, this.getY() + 7.0, this.getZ() + 7.0));
+        final List<Mob> list = this.level.getEntitiesOfClass(Mob.class, new AABB(this.getX() - 7.0, this.getY() - 7.0, this.getZ() - 7.0, this.getX() + 7.0, this.getY() + 7.0, this.getZ() + 7.0));
         for (final Mob entityinsentient : list) {
             if (entityinsentient.getLeashHolder() == entityhuman) {
                 if (CraftEventFactory.callPlayerLeashEntityEvent(entityinsentient, (LeashFenceKnotEntity) (Object) this, entityhuman, enumhand).isCancelled()) {
@@ -43,7 +41,6 @@ public abstract class LeashFenceKnotEntityMixin extends HangingEntityMixin {
                 }
             }
         }
-        boolean flag1 = false;
         if (!flag) {
             boolean die = true;
             for (final Mob entityinsentient : list) {
@@ -52,17 +49,12 @@ public abstract class LeashFenceKnotEntityMixin extends HangingEntityMixin {
                         die = false;
                     } else {
                         entityinsentient.dropLeash(true, !entityhuman.getAbilities().instabuild);
-                        flag1 = true;
                     }
                 }
             }
             if (die) {
-                this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.DROP);
                 this.discard();
             }
-        }
-        if (flag || flag1) {
-            this.gameEvent(GameEvent.BLOCK_ATTACH, entityhuman);
         }
         return InteractionResult.CONSUME;
     }

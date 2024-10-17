@@ -2,7 +2,7 @@ package io.izzel.arclight.common.mixin.bukkit;
 
 import io.izzel.arclight.common.bridge.bukkit.CraftItemStackBridge;
 import io.izzel.arclight.common.bridge.bukkit.ItemMetaBridge;
-import io.izzel.arclight.common.bridge.core.world.item.ItemStackBridge;
+import io.izzel.arclight.common.bridge.core.item.ItemStackBridge;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import org.bukkit.Material;
@@ -14,7 +14,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Desc;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -31,8 +30,7 @@ public abstract class CraftItemStackMixin implements CraftItemStackBridge {
     @Shadow static Material getType(ItemStack item) { throw new RuntimeException(); }
     // @formatter:on
 
-    @Desc(id = "getItemMeta", value = "getItemMeta", ret = ItemMeta.class, args = {ItemStack.class})
-    @Inject(method = "@Desc(getItemMeta)", cancellable = true, at = @At(value = "INVOKE", target = "Lorg/bukkit/Material;ordinal()I"))
+    @Inject(method = "getItemMeta(Lnet/minecraft/world/item/ItemStack;)Lorg/bukkit/inventory/meta/ItemMeta;", cancellable = true, at = @At(value = "INVOKE", target = "Lorg/bukkit/Material;ordinal()I"))
     private static void arclight$noTag(ItemStack item, CallbackInfoReturnable<ItemMeta> cir) {
         if (item.getTag() == null) {
             var meta = CraftItemFactory.instance().getItemMeta(getType(item));
@@ -41,8 +39,7 @@ public abstract class CraftItemStackMixin implements CraftItemStackBridge {
         }
     }
 
-    @Desc(id = "getItemMeta", value = "getItemMeta", ret = ItemMeta.class, args = {ItemStack.class})
-    @Inject(method = "@Desc(getItemMeta)", at = @At("RETURN"))
+    @Inject(method = "getItemMeta(Lnet/minecraft/world/item/ItemStack;)Lorg/bukkit/inventory/meta/ItemMeta;", at = @At("RETURN"))
     private static void arclight$offerCaps(ItemStack item, CallbackInfoReturnable<ItemMeta> cir) {
         if (item == null) return;
         ItemMeta meta = cir.getReturnValue();
@@ -53,8 +50,7 @@ public abstract class CraftItemStackMixin implements CraftItemStackBridge {
         ((ItemMetaBridge) meta).bridge$setForgeCaps(((ItemStackBridge) (Object) item).bridge$getForgeCaps());
     }
 
-    @Desc(id = "setItemMeta", value = "setItemMeta", args = {ItemStack.class, ItemMeta.class}, ret = boolean.class)
-    @Inject(method = "@Desc(setItemMeta)", at = @At(value = "INVOKE", ordinal = 1, remap = true, target = "Lnet/minecraft/world/item/ItemStack;getItem()Lnet/minecraft/world/item/Item;"))
+    @Inject(method = "setItemMeta(Lnet/minecraft/world/item/ItemStack;Lorg/bukkit/inventory/meta/ItemMeta;)Z", at = @At(value = "INVOKE", ordinal = 1, remap = true, target = "Lnet/minecraft/world/item/ItemStack;getItem()Lnet/minecraft/world/item/Item;"))
     private static void arclight$setCaps(ItemStack item, ItemMeta itemMeta, CallbackInfoReturnable<Boolean> cir) {
         CompoundTag forgeCaps = ((ItemMetaBridge) itemMeta).bridge$getForgeCaps();
         if (forgeCaps != null) {
@@ -66,7 +62,7 @@ public abstract class CraftItemStackMixin implements CraftItemStackBridge {
      * @author IzzelAliz
      * @reason
      */
-    @Overwrite(remap = false)
+    @Overwrite
     public boolean isSimilar(org.bukkit.inventory.ItemStack stack) {
         if (stack == null) {
             return false;
@@ -95,8 +91,7 @@ public abstract class CraftItemStackMixin implements CraftItemStackBridge {
             : !that.hasItemMeta();
     }
 
-    @Desc(id = "hasItemMeta", value = "hasItemMeta", args = ItemStack.class, ret = boolean.class)
-    @Inject(method = "@Desc(hasItemMeta)", cancellable = true, at = @At("HEAD"))
+    @Inject(method = "hasItemMeta(Lnet/minecraft/world/item/ItemStack;)Z", cancellable = true, at = @At("HEAD"))
     private static void arclight$hasMeta(ItemStack item, CallbackInfoReturnable<Boolean> cir) {
         if (item != null) {
             CompoundTag forgeCaps = ((ItemStackBridge) (Object) item).bridge$getForgeCaps();

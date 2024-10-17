@@ -2,7 +2,7 @@ package io.izzel.arclight.common.mixin.core.world.entity.npc;
 
 import io.izzel.arclight.common.bridge.core.entity.merchant.IMerchantBridge;
 import io.izzel.arclight.common.bridge.core.inventory.IInventoryBridge;
-import io.izzel.arclight.common.bridge.core.world.item.MerchantOfferBridge;
+import io.izzel.arclight.common.bridge.core.item.MerchantOfferBridge;
 import io.izzel.arclight.common.mixin.core.world.entity.PathfinderMobMixin;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.EntityType;
@@ -40,7 +40,7 @@ public abstract class AbstractVillagerMixin extends PathfinderMobMixin implement
         return (craftMerchant == null) ? craftMerchant = new CraftMerchant((net.minecraft.world.entity.npc.AbstractVillager) (Object) this) : craftMerchant;
     }
 
-    @Redirect(method = "addOffersFromItemListings", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/trading/MerchantOffers;add(Ljava/lang/Object;)Z"))
+    @Redirect(method = "addOffersFromItemListings", at = @At(value = "INVOKE", remap = false, target = "Lnet/minecraft/world/item/trading/MerchantOffers;add(Ljava/lang/Object;)Z"))
     private boolean arclight$gainOffer(MerchantOffers merchantOffers, Object e) {
         MerchantOffer offer = (MerchantOffer) e;
         VillagerAcquireTradeEvent event = new VillagerAcquireTradeEvent((AbstractVillager) getBukkitEntity(), ((MerchantOfferBridge) offer).bridge$asBukkit());

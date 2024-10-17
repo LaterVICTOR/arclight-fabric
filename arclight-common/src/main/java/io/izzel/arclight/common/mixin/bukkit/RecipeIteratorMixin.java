@@ -1,9 +1,7 @@
 package io.izzel.arclight.common.mixin.bukkit;
 
-import io.izzel.arclight.common.bridge.core.world.item.crafting.RecipeHolderBridge;
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import io.izzel.arclight.common.bridge.core.item.crafting.IRecipeBridge;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
 import org.bukkit.craftbukkit.v.inventory.RecipeIterator;
 import org.bukkit.inventory.Recipe;
@@ -19,9 +17,25 @@ import java.util.Map;
 public class RecipeIteratorMixin {
 
     // @formatter:off
-    @Shadow @Final private Iterator<Map.Entry<RecipeType<?>, Object2ObjectLinkedOpenHashMap<ResourceLocation, RecipeHolder<?>>>> recipes;
-    @Shadow private Iterator<RecipeHolder<?>> current;
+    @Shadow private Iterator<net.minecraft.world.item.crafting.Recipe<?>> current;
+    @Shadow @Final private Iterator<Map.Entry<RecipeType<?>, Map<ResourceLocation, net.minecraft.world.item.crafting.Recipe<?>>>> recipes;
     // @formatter:on
+
+    /**
+     * @author IzzelAliz
+     * @reason
+     */
+    @Overwrite
+    public boolean hasNext() {
+        if (current != null && current.hasNext()) {
+            return true;
+        }
+        if (recipes.hasNext()) {
+            current = recipes.next().getValue().values().iterator();
+            return hasNext();
+        }
+        return false;
+    }
 
     /**
      * @author IzzelAliz
@@ -33,11 +47,11 @@ public class RecipeIteratorMixin {
             current = recipes.next().getValue().values().iterator();
             return next();
         }
-        var recipe = current.next();
+        net.minecraft.world.item.crafting.Recipe<?> recipe = current.next();
         try {
-            return ((RecipeHolderBridge) (Object) recipe).bridge$toBukkitRecipe();
+            return ((IRecipeBridge) recipe).bridge$toBukkitRecipe();
         } catch (Throwable e) {
-            throw new RuntimeException("Error converting recipe " + recipe.id(), e);
+            throw new RuntimeException("Error converting recipe " + recipe.getId(), e);
         }
     }
 }

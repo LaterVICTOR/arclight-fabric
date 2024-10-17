@@ -14,8 +14,6 @@ import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.ResultContainer;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.CraftingRecipe;
-import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RepairItemRecipe;
 import net.minecraft.world.level.Level;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
@@ -60,12 +58,12 @@ public abstract class CraftingMenuMixin extends AbstractContainerMenuMixin imple
     private static transient boolean arclight$isRepair;
 
     @Redirect(method = "slotChangedCraftingGrid", at = @At(value = "INVOKE", remap = false, target = "Ljava/util/Optional;isPresent()Z"))
-    private static boolean arclight$testRepair(Optional<RecipeHolder<CraftingRecipe>> optional) {
-        arclight$isRepair = optional.map(RecipeHolder::value).orElse(null) instanceof RepairItemRecipe;
+    private static boolean arclight$testRepair(Optional<?> optional) {
+        arclight$isRepair = optional.orElse(null) instanceof RepairItemRecipe;
         return optional.isPresent();
     }
 
-    @ModifyVariable(method = "slotChangedCraftingGrid", ordinal = 0, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/inventory/ResultContainer;setItem(ILnet/minecraft/world/item/ItemStack;)V"))
+    @ModifyVariable(method = "slotChangedCraftingGrid", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/inventory/ResultContainer;setItem(ILnet/minecraft/world/item/ItemStack;)V"))
     private static ItemStack arclight$preCraft(ItemStack stack, AbstractContainerMenu container, Level level, Player player, CraftingContainer craftingContainer, ResultContainer resultContainer) {
         return CraftEventFactory.callPreCraftEvent(craftingContainer, resultContainer, stack, ((ContainerBridge) container).bridge$getBukkitView(), arclight$isRepair);
     }

@@ -1,7 +1,5 @@
 package io.izzel.arclight.common.mixin.core.world.entity.boss.wither;
 
-import io.izzel.arclight.common.bridge.core.world.WorldBridge;
-import io.izzel.arclight.common.bridge.core.world.level.block.BlockBridge;
 import io.izzel.arclight.common.mixin.core.world.entity.PathfinderMobMixin;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerBossEvent;
@@ -10,22 +8,19 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.event.ForgeEventFactory;
 import org.bukkit.Bukkit;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.entity.ExplosionPrimeEvent;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
 
@@ -46,11 +41,6 @@ public abstract class WitherBossMixin extends PathfinderMobMixin {
     @Shadow @Final public ServerBossEvent bossEvent;
     // @formatter:on
 
-    @Inject(method = "checkDespawn", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/boss/wither/WitherBoss;discard()V"))
-    private void arclight$despawn(CallbackInfo ci) {
-        this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.DESPAWN);
-    }
-
     /**
      * @author IzzelAliz
      * @reason
@@ -61,13 +51,14 @@ public abstract class WitherBossMixin extends PathfinderMobMixin {
             int k1 = this.getInvulnerableTicks() - 1;
             this.bossEvent.setProgress(1.0F - (float) k1 / 220.0F);
             if (k1 <= 0) {
+                Explosion.BlockInteraction explosion$blockinteraction = ForgeEventFactory.getMobGriefingEvent(this.level, (WitherBoss) (Object) this) ? Explosion.BlockInteraction.DESTROY : Explosion.BlockInteraction.NONE;
                 ExplosionPrimeEvent event = new ExplosionPrimeEvent(this.getBukkitEntity(), 7.0F, false);
                 Bukkit.getPluginManager().callEvent(event);
                 if (!event.isCancelled()) {
-                    this.level().explode((WitherBoss) (Object) this, this.getX(), this.getEyeY(), this.getZ(), event.getRadius(), event.getFire(), Level.ExplosionInteraction.MOB);
+                    this.level.explode((WitherBoss) (Object) this, this.getX(), this.getEyeY(), this.getZ(), event.getRadius(), event.getFire(), explosion$blockinteraction);
                 }
                 if (!this.isSilent()) {
-                    this.level().globalLevelEvent(1023, this.blockPosition(), 0);
+                    this.level.globalLevelEvent(1023, this.blockPosition(), 0);
                 }
             }
 
@@ -83,7 +74,7 @@ public abstract class WitherBossMixin extends PathfinderMobMixin {
             for (int i = 1; i < 3; ++i) {
                 if (this.tickCount >= this.nextHeadUpdate[i - 1]) {
                     this.nextHeadUpdate[i - 1] = this.tickCount + 10 + this.random.nextInt(10);
-                    if (this.level().getDifficulty() == Difficulty.NORMAL || this.level().getDifficulty() == Difficulty.HARD) {
+                    if (this.level.getDifficulty() == Difficulty.NORMAL || this.level.getDifficulty() == Difficulty.HARD) {
                         int i3 = i - 1;
                         int j3 = this.idleHeadUpdates[i - 1];
                         this.idleHeadUpdates[i3] = this.idleHeadUpdates[i - 1] + 1;
@@ -98,7 +89,7 @@ public abstract class WitherBossMixin extends PathfinderMobMixin {
 
                     int l1 = this.getAlternativeTarget(i);
                     if (l1 > 0) {
-                        LivingEntity livingentity = (LivingEntity) this.level().getEntity(l1);
+                        LivingEntity livingentity = (LivingEntity) this.level.getEntity(l1);
                         if (livingentity != null && this.canAttack(livingentity) && !(this.distanceToSqr(livingentity) > 900.0D) && this.hasLineOfSight(livingentity)) {
                             this.performRangedAttack(i + 1, livingentity);
                             this.nextHeadUpdate[i - 1] = this.tickCount + 40 + this.random.nextInt(20);
@@ -109,7 +100,7 @@ public abstract class WitherBossMixin extends PathfinderMobMixin {
                             this.setAlternativeTarget(i, 0);
                         }
                     } else {
-                        List<LivingEntity> list = this.level().getNearbyEntities(LivingEntity.class, TARGETING_CONDITIONS, (WitherBoss) (Object) this, this.getBoundingBox().inflate(20.0D, 8.0D, 20.0D));
+                        List<LivingEntity> list = this.level.getNearbyEntities(LivingEntity.class, TARGETING_CONDITIONS, (WitherBoss) (Object) this, this.getBoundingBox().inflate(20.0D, 8.0D, 20.0D));
                         if (!list.isEmpty()) {
                             LivingEntity livingentity1 = list.get(this.random.nextInt(list.size()));
                             if (CraftEventFactory.callEntityTargetLivingEvent((WitherBoss) (Object) this, livingentity1, EntityTargetEvent.TargetReason.CLOSEST_ENTITY).isCancelled())
@@ -128,7 +119,7 @@ public abstract class WitherBossMixin extends PathfinderMobMixin {
 
             if (this.destroyBlocksTick > 0) {
                 --this.destroyBlocksTick;
-                if (this.destroyBlocksTick == 0 && ((WorldBridge) this.level()).bridge$forge$mobGriefing((WitherBoss) (Object) this)) {
+                if (this.destroyBlocksTick == 0 && ForgeEventFactory.getMobGriefingEvent(this.level, (WitherBoss) (Object) this)) {
                     int j1 = Mth.floor(this.getY());
                     int i2 = Mth.floor(this.getX());
                     int j2 = Mth.floor(this.getZ());
@@ -141,20 +132,19 @@ public abstract class WitherBossMixin extends PathfinderMobMixin {
                                 int l = j1 + k;
                                 int i1 = j2 + k2;
                                 BlockPos blockpos = new BlockPos(l2, l, i1);
-                                BlockState blockstate = this.level().getBlockState(blockpos);
-                                if (((BlockBridge) blockstate.getBlock()).bridge$forge$canEntityDestroy(blockstate, this.level(), blockpos, (WitherBoss) (Object) this)
-                                    && this.bridge$forge$onEntityDestroyBlock((WitherBoss) (Object) this, blockpos, blockstate)) {
-                                    if (!CraftEventFactory.callEntityChangeBlockEvent((WitherBoss) (Object) this, blockpos, Blocks.AIR.defaultBlockState())) {
+                                BlockState blockstate = this.level.getBlockState(blockpos);
+                                if (blockstate.canEntityDestroy(this.level, blockpos, (WitherBoss) (Object) this) && ForgeEventFactory.onEntityDestroyBlock((WitherBoss) (Object) this, blockpos, blockstate)) {
+                                    if (CraftEventFactory.callEntityChangeBlockEvent((WitherBoss) (Object) this, blockpos, Blocks.AIR.defaultBlockState()).isCancelled()) {
                                         continue;
                                     }
-                                    flag = this.level().destroyBlock(blockpos, true, (WitherBoss) (Object) this) || flag;
+                                    flag = this.level.destroyBlock(blockpos, true, (WitherBoss) (Object) this) || flag;
                                 }
                             }
                         }
                     }
 
                     if (flag) {
-                        this.level().levelEvent(null, 1022, this.blockPosition(), 0);
+                        this.level.levelEvent(null, 1022, this.blockPosition(), 0);
                     }
                 }
             }

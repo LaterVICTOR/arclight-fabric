@@ -3,7 +3,6 @@ package io.izzel.arclight.common.mixin.core.world.entity.decoration;
 import com.google.common.collect.Lists;
 import io.izzel.arclight.common.bridge.core.entity.EntityBridge;
 import io.izzel.arclight.common.bridge.core.entity.player.ServerPlayerEntityBridge;
-import io.izzel.arclight.common.bridge.core.world.WorldBridge;
 import io.izzel.arclight.common.mixin.core.world.entity.LivingEntityMixin;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
@@ -19,7 +18,6 @@ import org.bukkit.craftbukkit.v.event.CraftEventFactory;
 import org.bukkit.craftbukkit.v.inventory.CraftItemStack;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.spongepowered.asm.mixin.Final;
@@ -60,7 +58,7 @@ public abstract class ArmorStandMixin extends LivingEntityMixin {
         }
     }
 
-    @Inject(method = "hurt", cancellable = true, at = @At(value = "FIELD", target = "Lnet/minecraft/tags/DamageTypeTags;IS_EXPLOSION:Lnet/minecraft/tags/TagKey;"))
+    @Inject(method = "hurt", cancellable = true, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/damagesource/DamageSource;isExplosion()Z"))
     public void arclight$damageNormal(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         if (CraftEventFactory.handleNonLivingEntityDamageEvent((net.minecraft.world.entity.decoration.ArmorStand) (Object) this, source, amount, true, this.invisible)) {
             cir.setReturnValue(false);
@@ -112,18 +110,25 @@ public abstract class ArmorStandMixin extends LivingEntityMixin {
     }
 
     private void arclight$tryCaptureDrops(Level worldIn, BlockPos pos, ItemStack stack) {
-        if (!worldIn.isClientSide && !stack.isEmpty() && worldIn.getGameRules().getBoolean(GameRules.RULE_DOBLOCKDROPS) && !((WorldBridge) worldIn).bridge$forge$restoringBlockSnapshots()) { // do not drop items while restoring blockstates, prevents item dupe
+        if (!worldIn.isClientSide && !stack.isEmpty() && worldIn.getGameRules().getBoolean(GameRules.RULE_DOBLOCKDROPS) && !worldIn.restoringBlockSnapshots) { // do not drop items while restoring blockstates, prevents item dupe
             ItemEntity itementity = new ItemEntity(worldIn, pos.getX(), pos.getY(), pos.getZ(), stack);
-            if (!this.bridge$common$isCapturingDrops()) {
-                this.bridge$common$startCaptureDrops();
-            }
-            this.bridge$common$captureDrop(itementity);
+            arclight$drops().add(itementity);
+        }
+    }
+
+    private Collection<ItemEntity> arclight$drops() {
+        Collection<ItemEntity> drops = this.captureDrops();
+        if (drops == null) {
+            ArrayList<ItemEntity> list = new ArrayList<>();
+            this.captureDrops(list);
+            return list;
+        } else {
+            return drops;
         }
     }
 
     private void arclight$callEntityDeath() {
-        this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.DEATH);
-        Collection<ItemEntity> captureDrops = this.bridge$common$getCapturedDrops();
+        Collection<ItemEntity> captureDrops = this.captureDrops(null);
         List<org.bukkit.inventory.ItemStack> drops;
         if (captureDrops == null) {
             drops = new ArrayList<>();
@@ -158,10 +163,8 @@ public abstract class ArmorStandMixin extends LivingEntityMixin {
     @Override
     public void setItemSlot(net.minecraft.world.entity.EquipmentSlot slotIn, ItemStack stack, boolean silent) {
         switch (slotIn.getType()) {
-            case HAND ->
-                this.bridge$playEquipSound(slotIn, this.handItems.set(slotIn.getIndex(), stack), stack, silent);
-            case ARMOR ->
-                this.bridge$playEquipSound(slotIn, this.armorItems.set(slotIn.getIndex(), stack), stack, silent);
+            case HAND -> this.bridge$playEquipSound(slotIn, this.handItems.set(slotIn.getIndex(), stack), stack, silent);
+            case ARMOR -> this.bridge$playEquipSound(slotIn, this.armorItems.set(slotIn.getIndex(), stack), stack, silent);
         }
 
     }

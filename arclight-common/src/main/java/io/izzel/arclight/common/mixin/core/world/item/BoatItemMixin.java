@@ -35,7 +35,7 @@ public abstract class BoatItemMixin extends Item {
     // @formatter:off
     @Shadow @Final private static Predicate<Entity> ENTITY_PREDICATE;
     @Shadow @Final private Boat.Type type;
-    @Shadow protected abstract Boat getBoat(Level p_220017_, HitResult p_220018_, ItemStack p_311821_, Player p_313119_);
+    @Shadow protected abstract Boat getBoat(Level p_220017_, HitResult p_220018_);
     // @formatter:on
 
     public BoatItemMixin(Properties properties) {
@@ -69,15 +69,15 @@ public abstract class BoatItemMixin extends Item {
 
             if (result.getType() == HitResult.Type.BLOCK) {
                 if (DistValidate.isValid(worldIn)) {
-                    PlayerInteractEvent event = CraftEventFactory.callPlayerInteractEvent(playerIn, Action.RIGHT_CLICK_BLOCK, result.getBlockPos(), result.getDirection(), itemstack, false, handIn, result.getLocation());
+                    PlayerInteractEvent event = CraftEventFactory.callPlayerInteractEvent(playerIn, Action.RIGHT_CLICK_BLOCK, result.getBlockPos(), result.getDirection(), itemstack, handIn);
 
                     if (event.isCancelled()) {
                         return new InteractionResultHolder<>(InteractionResult.PASS, itemstack);
                     }
                 }
 
-                Boat boatentity = this.getBoat(worldIn, result, itemstack, playerIn);
-                boatentity.setVariant(this.type);
+                Boat boatentity = this.getBoat(worldIn, result);
+                boatentity.setType(this.type);
                 boatentity.setYRot(playerIn.getYRot());
                 if (!worldIn.noCollision(boatentity, boatentity.getBoundingBox().inflate(-0.1D))) {
                     return new InteractionResultHolder<>(InteractionResult.FAIL, itemstack);

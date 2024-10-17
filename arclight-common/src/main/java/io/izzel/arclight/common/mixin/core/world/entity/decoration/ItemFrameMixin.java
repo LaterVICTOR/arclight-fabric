@@ -1,7 +1,6 @@
 package io.izzel.arclight.common.mixin.core.world.entity.decoration;
 
 import io.izzel.arclight.common.mixin.core.world.entity.item.HangingEntityMixin;
-import io.izzel.arclight.common.mod.mixins.annotation.TransformAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -13,7 +12,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
-import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -47,11 +45,10 @@ public abstract class ItemFrameMixin extends HangingEntityMixin {
             this.playSound(SoundEvents.ITEM_FRAME_ADD_ITEM, 1.0f, 1.0f);
         }
         if (flag && this.pos != null) {
-            this.level().updateNeighbourForOutputSignal(this.pos, Blocks.AIR);
+            this.level.updateNeighbourForOutputSignal(this.pos, Blocks.AIR);
         }
     }
 
-    @TransformAccess(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC)
     private static AABB calculateBoundingBox(Entity entity, BlockPos blockPosition, Direction direction, int width, int height) {
         double d0 = 0.46875;
         double locX = blockPosition.getX() + 0.5 - direction.getStepX() * 0.46875;

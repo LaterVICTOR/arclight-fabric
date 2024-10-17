@@ -1,7 +1,6 @@
 package io.izzel.arclight.common.mixin.core.world.entity.monster;
 
 import io.izzel.arclight.api.ArclightVersion;
-import io.izzel.arclight.common.bridge.core.world.WorldBridge;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -11,6 +10,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.InfestedBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.event.ForgeEventFactory;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -31,7 +31,7 @@ public abstract class Silverfish_WakeUpFriendsGoalMixin extends Goal {
     public void tick() {
         --this.lookForFriends;
         if (this.lookForFriends <= 0) {
-            Level world = this.silverfish.level();
+            Level world = this.silverfish.level;
             RandomSource random = this.silverfish.getRandom();
             BlockPos blockpos = this.silverfish.blockPosition();
 
@@ -42,10 +42,10 @@ public abstract class Silverfish_WakeUpFriendsGoalMixin extends Goal {
                         BlockState blockstate = world.getBlockState(blockpos1);
                         Block block = blockstate.getBlock();
                         if (block instanceof InfestedBlock) {
-                            if (!CraftEventFactory.callEntityChangeBlockEvent(this.silverfish, blockpos1, Blocks.AIR.defaultBlockState())) {
+                            if (CraftEventFactory.callEntityChangeBlockEvent(this.silverfish, blockpos1, Blocks.AIR.defaultBlockState()).isCancelled()) {
                                 continue;
                             }
-                            if (((WorldBridge) world).bridge$forge$mobGriefing(this.silverfish)) {
+                            if (ForgeEventFactory.getMobGriefingEvent(world, this.silverfish)) {
                                 if (ArclightVersion.atLeast(ArclightVersion.v1_15)) {
                                     world.destroyBlock(blockpos1, true, this.silverfish);
                                 } else {

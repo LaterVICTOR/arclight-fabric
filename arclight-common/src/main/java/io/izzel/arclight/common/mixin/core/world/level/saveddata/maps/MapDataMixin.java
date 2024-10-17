@@ -33,7 +33,7 @@ public abstract class MapDataMixin implements MapDataBridge {
 
     public CraftMapView mapView;
     private CraftServer server;
-    public UUID uniqueId;
+    private UUID uniqueId;
     public String id;
 
     @Inject(method = "<init>", at = @At("RETURN"))

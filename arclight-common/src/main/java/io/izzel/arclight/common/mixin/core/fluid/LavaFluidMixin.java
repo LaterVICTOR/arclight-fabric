@@ -1,6 +1,5 @@
 package io.izzel.arclight.common.mixin.core.fluid;
 
-import io.izzel.arclight.common.bridge.core.fluid.LavaFluidBridge;
 import io.izzel.arclight.common.bridge.core.world.IWorldBridge;
 import io.izzel.arclight.common.mod.util.DistValidate;
 import io.izzel.arclight.mixin.Eject;
@@ -15,6 +14,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.LavaFluid;
+import net.minecraftforge.event.ForgeEventFactory;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -23,11 +23,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LavaFluid.class)
-public abstract class LavaFluidMixin implements LavaFluidBridge {
+public abstract class LavaFluidMixin {
 
     // @formatter:off
     @Shadow protected abstract boolean hasFlammableNeighbours(LevelReader worldIn, BlockPos pos);
-    @Shadow protected abstract boolean isFlammable(LevelReader arg, BlockPos arg2);
+    @Shadow protected abstract boolean isFlammable(LevelReader level, BlockPos pos, Direction face);
     // @formatter:on
 
     /**
@@ -55,10 +55,10 @@ public abstract class LavaFluidMixin implements LavaFluidBridge {
                                     continue;
                                 }
                             }
-                            world.setBlockAndUpdate(blockpos, bridge$forge$fireFluidPlaceBlockEvent(world, blockpos, pos, Blocks.FIRE.defaultBlockState()));
+                            world.setBlockAndUpdate(blockpos, ForgeEventFactory.fireFluidPlaceBlockEvent(world, blockpos, pos, Blocks.FIRE.defaultBlockState()));
                             return;
                         }
-                    } else if (blockstate.blocksMotion()) {
+                    } else if (blockstate.getMaterial().blocksMotion()) {
                         return;
                     }
                 }
@@ -69,14 +69,14 @@ public abstract class LavaFluidMixin implements LavaFluidBridge {
                         return;
                     }
 
-                    if (world.isEmptyBlock(blockpos1.above()) && bridge$forge$isFlammable(world, blockpos1, Direction.UP)) {
+                    if (world.isEmptyBlock(blockpos1.above()) && this.isFlammable(world, blockpos1, Direction.UP)) {
                         BlockPos up = blockpos1.above();
                         if (world.getBlockState(up).getBlock() != Blocks.FIRE) {
                             if (DistValidate.isValid(world) && CraftEventFactory.callBlockIgniteEvent(world, up, pos).isCancelled()) {
                                 continue;
                             }
                         }
-                        world.setBlockAndUpdate(blockpos1.above(), bridge$forge$fireFluidPlaceBlockEvent(world, blockpos1.above(), pos, Blocks.FIRE.defaultBlockState()));
+                        world.setBlockAndUpdate(blockpos1.above(), ForgeEventFactory.fireFluidPlaceBlockEvent(world, blockpos1.above(), pos, Blocks.FIRE.defaultBlockState()));
                     }
                 }
             }
@@ -93,10 +93,5 @@ public abstract class LavaFluidMixin implements LavaFluidBridge {
         } else {
             return true;
         }
-    }
-
-    @Override
-    public boolean bridge$forge$isFlammable(LevelReader level, BlockPos pos, Direction face) {
-        return this.isFlammable(level, pos);
     }
 }

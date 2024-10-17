@@ -40,15 +40,17 @@ public abstract class LevelChunkMixin extends ChunkAccessMixin implements ChunkB
     @Shadow @Final public Level level;
     // @formatter:on
 
+    public org.bukkit.Chunk bukkitChunk;
     public boolean mustNotSave;
     public boolean needsDecoration;
     private transient boolean arclight$doPlace;
-    public ServerLevel r; // TODO f_62776_ check on update
+    public ServerLevel q; // TODO f_62776_ check on update
 
     @Inject(method = "<init>(Lnet/minecraft/world/level/Level;Lnet/minecraft/world/level/ChunkPos;Lnet/minecraft/world/level/chunk/UpgradeData;Lnet/minecraft/world/ticks/LevelChunkTicks;Lnet/minecraft/world/ticks/LevelChunkTicks;J[Lnet/minecraft/world/level/chunk/LevelChunkSection;Lnet/minecraft/world/level/chunk/LevelChunk$PostLoadProcessor;Lnet/minecraft/world/level/levelgen/blending/BlendingData;)V", at = @At("RETURN"))
     private void arclight$init(Level worldIn, ChunkPos p_196855_, UpgradeData p_196856_, LevelChunkTicks<Block> p_196857_, LevelChunkTicks<Fluid> p_196858_, long p_196859_, @Nullable LevelChunkSection[] p_196860_, @Nullable LevelChunk.PostLoadProcessor p_196861_, @Nullable BlendingData p_196862_, CallbackInfo ci) {
         if (DistValidate.isValid(worldIn)) {
-            this.r = ((ServerLevel) worldIn);
+            this.q = ((ServerLevel) worldIn);
+            this.bukkitChunk = new CraftChunk((LevelChunk) (Object) this);
         }
     }
 
@@ -66,17 +68,22 @@ public abstract class LevelChunkMixin extends ChunkAccessMixin implements ChunkB
     }
 
     public org.bukkit.Chunk getBukkitChunk() {
-        return new CraftChunk((LevelChunk) (Object) this);
+        return bukkitChunk;
     }
 
     @Override
     public org.bukkit.Chunk bridge$getBukkitChunk() {
-        return getBukkitChunk();
+        return bukkitChunk;
     }
 
     @Override
     public CraftPersistentDataContainer bridge$getPersistentContainer() {
         return this.persistentDataContainer;
+    }
+
+    @Override
+    public void bridge$setBukkitChunk(org.bukkit.Chunk chunk) {
+        this.bukkitChunk = chunk;
     }
 
     public BlockState setBlockState(BlockPos pos, BlockState state, boolean isMoving, boolean doPlace) {
@@ -126,9 +133,7 @@ public abstract class LevelChunkMixin extends ChunkAccessMixin implements ChunkB
              * the World constructor. We can't reliably alter that, so we have
              * no way of creating a CraftWorld/CraftServer at that point.
              */
-
-            var bukkitChunk = new CraftChunk((LevelChunk) (Object) this);
-            server.getPluginManager().callEvent(new ChunkLoadEvent(bukkitChunk, this.needsDecoration));
+            server.getPluginManager().callEvent(new ChunkLoadEvent(this.bukkitChunk, this.needsDecoration));
 
             if (this.needsDecoration) {
                 this.needsDecoration = false;
@@ -156,8 +161,7 @@ public abstract class LevelChunkMixin extends ChunkAccessMixin implements ChunkB
 
     public void unloadCallback() {
         org.bukkit.Server server = Bukkit.getServer();
-        var bukkitChunk = new CraftChunk((LevelChunk) (Object) this);
-        org.bukkit.event.world.ChunkUnloadEvent unloadEvent = new org.bukkit.event.world.ChunkUnloadEvent(bukkitChunk, this.isUnsaved());
+        org.bukkit.event.world.ChunkUnloadEvent unloadEvent = new org.bukkit.event.world.ChunkUnloadEvent(this.bukkitChunk, this.isUnsaved());
         server.getPluginManager().callEvent(unloadEvent);
         // note: saving can be prevented, but not forced if no saving is actually required
         this.mustNotSave = !unloadEvent.isSaveChunk();

@@ -3,33 +3,26 @@ package io.izzel.arclight.common.mixin.core.world.spawner;
 import io.izzel.arclight.common.bridge.core.entity.MobEntityBridge;
 import io.izzel.arclight.common.bridge.core.world.WorldBridge;
 import io.izzel.arclight.common.bridge.core.world.server.ServerWorldBridge;
-import io.izzel.arclight.common.bridge.core.world.spawner.BaseSpawnerBridge;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.RandomSource;
 import net.minecraft.util.random.SimpleWeightedRandomList;
 import net.minecraft.world.Difficulty;
-import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntitySelector;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
-import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.SpawnPlacements;
 import net.minecraft.world.level.BaseSpawner;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.SpawnData;
-import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.AABB;
+import net.minecraftforge.event.ForgeEventFactory;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
 import org.bukkit.event.entity.CreatureSpawnEvent;
-import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
@@ -40,21 +33,21 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.Optional;
 
 @Mixin(BaseSpawner.class)
-public abstract class BaseSpawnerMixin implements BaseSpawnerBridge {
+public abstract class BaseSpawnerMixin {
 
     // @formatter:off
     @Shadow public SimpleWeightedRandomList<SpawnData> spawnPotentials;
     @Shadow public int spawnDelay;
     @Shadow public int spawnCount;
+    @Shadow public SpawnData nextSpawnData;
     @Shadow public int spawnRange;
     @Shadow public int maxNearbyEntities;
     @Shadow protected abstract boolean isNearPlayer(Level p_151344_, BlockPos p_151345_);
     @Shadow protected abstract void delay(Level p_151351_, BlockPos p_151352_);
-    @Shadow protected abstract SpawnData getOrCreateNextSpawnData(@Nullable Level p_254503_, RandomSource p_253892_, BlockPos p_254487_);
     // @formatter:on
 
     @Inject(method = "setEntityId", at = @At("RETURN"))
-    public void arclight$clearMobs(CallbackInfo ci) {
+    public void arclight$clearMobs(EntityType<?> type, CallbackInfo ci) {
         this.spawnPotentials = SimpleWeightedRandomList.empty();
     }
 
@@ -73,11 +66,9 @@ public abstract class BaseSpawnerMixin implements BaseSpawnerBridge {
                 --this.spawnDelay;
             } else {
                 boolean flag = false;
-                RandomSource randomsource = level.getRandom();
-                SpawnData spawnData = this.getOrCreateNextSpawnData(level, randomsource, pos);
 
                 for (int i = 0; i < this.spawnCount; ++i) {
-                    CompoundTag compoundtag = spawnData.getEntityToSpawn();
+                    CompoundTag compoundtag = this.nextSpawnData.getEntityToSpawn();
                     Optional<EntityType<?>> optional = EntityType.by(compoundtag);
                     if (optional.isEmpty()) {
                         this.delay(level, pos);
@@ -90,13 +81,13 @@ public abstract class BaseSpawnerMixin implements BaseSpawnerBridge {
                     double d1 = j >= 2 ? listtag.getDouble(1) : (double) (pos.getY() + level.random.nextInt(3) - 1);
                     double d2 = j >= 3 ? listtag.getDouble(2) : (double) pos.getZ() + (level.random.nextDouble() - level.random.nextDouble()) * (double) this.spawnRange + 0.5D;
                     if (level.noCollision(optional.get().getAABB(d0, d1, d2))) {
-                        BlockPos blockpos = BlockPos.containing(d0, d1, d2);
-                        if (spawnData.getCustomSpawnRules().isPresent()) {
+                        BlockPos blockpos = new BlockPos(d0, d1, d2);
+                        if (this.nextSpawnData.getCustomSpawnRules().isPresent()) {
                             if (!optional.get().getCategory().isFriendly() && level.getDifficulty() == Difficulty.PEACEFUL) {
                                 continue;
                             }
 
-                            SpawnData.CustomSpawnRules spawndata$customspawnrules = spawnData.getCustomSpawnRules().get();
+                            SpawnData.CustomSpawnRules spawndata$customspawnrules = this.nextSpawnData.getCustomSpawnRules().get();
                             if (!spawndata$customspawnrules.blockLightLimit().isValueInRange(level.getBrightness(LightLayer.BLOCK, blockpos)) || !spawndata$customspawnrules.skyLightLimit().isValueInRange(level.getBrightness(LightLayer.SKY, blockpos))) {
                                 continue;
                             }
@@ -113,7 +104,7 @@ public abstract class BaseSpawnerMixin implements BaseSpawnerBridge {
                             return;
                         }
 
-                        int k = level.getEntities(EntityTypeTest.forExactClass(entity.getClass()), (new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1)).inflate(this.spawnRange), EntitySelector.NO_SPECTATORS).size();
+                        int k = level.getEntitiesOfClass(entity.getClass(), (new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1)).inflate(this.spawnRange)).size();
                         if (k >= this.maxNearbyEntities) {
                             this.delay(level, pos);
                             return;
@@ -121,14 +112,20 @@ public abstract class BaseSpawnerMixin implements BaseSpawnerBridge {
 
                         entity.moveTo(entity.getX(), entity.getY(), entity.getZ(), level.random.nextFloat() * 360.0F, 0.0F);
                         if (entity instanceof Mob mob) {
-                            if (this.bridge$forge$checkSpawnRules(mob, level, MobSpawnType.SPAWNER, spawnData, spawnData.getCustomSpawnRules().isEmpty() && !mob.checkSpawnRules(level, MobSpawnType.SPAWNER) || !mob.checkSpawnObstruction(level))) {
-                                continue;
+                            var res = ForgeEventFactory.canEntitySpawn(mob, level, (float) entity.getX(), (float) entity.getY(), (float) entity.getZ(), (BaseSpawner) (Object) this, MobSpawnType.SPAWNER);
+                            if (res == net.minecraftforge.eventbus.api.Event.Result.DENY) continue;
+                            if (res == net.minecraftforge.eventbus.api.Event.Result.DEFAULT) {
+                                if (this.nextSpawnData.getCustomSpawnRules().isEmpty() && !mob.checkSpawnRules(level, MobSpawnType.SPAWNER) || !mob.checkSpawnObstruction(level)) {
+                                    continue;
+                                }
                             }
 
-                            if (spawnData.getEntityToSpawn().size() == 1 && spawnData.getEntityToSpawn().contains("id", 8)) {
-                                this.bridge$forge$finalizeSpawnerSpawn(mob, level, level.getCurrentDifficultyAt(entity.blockPosition()), null, compoundtag);
+                            if (!ForgeEventFactory.doSpecialSpawn(mob, level, (float) entity.getX(), (float) entity.getY(), (float) entity.getZ(), (BaseSpawner) (Object) this, MobSpawnType.SPAWNER)) {
+                                if (this.nextSpawnData.getEntityToSpawn().size() == 1 && this.nextSpawnData.getEntityToSpawn().contains("id", 8)) {
+                                    ((Mob) entity).finalizeSpawn(level, level.getCurrentDifficultyAt(entity.blockPosition()), MobSpawnType.SPAWNER, null, null);
+                                }
                             }
-                            if (((WorldBridge) mob.level()).bridge$spigotConfig().nerfSpawnerMobs) {
+                            if (((WorldBridge) mob.level).bridge$spigotConfig().nerfSpawnerMobs) {
                                 ((MobEntityBridge) mob).bridge$setAware(false);
                             }
                         }
@@ -141,9 +138,6 @@ public abstract class BaseSpawnerMixin implements BaseSpawnerBridge {
                             for (Entity passenger : entity.getIndirectPassengers()) {
                                 passenger.discard();
                             }
-                            continue;
-                        }
-                        if (CraftEventFactory.callSpawnerSpawnEvent(entity, pos).isCancelled()) {
                             continue;
                         }
                         if (!((ServerWorldBridge) level).bridge$addAllEntitiesSafely(entity, CreatureSpawnEvent.SpawnReason.SPAWNER)) {
@@ -166,15 +160,5 @@ public abstract class BaseSpawnerMixin implements BaseSpawnerBridge {
                 }
             }
         }
-    }
-
-    @Override
-    public boolean bridge$forge$checkSpawnRules(Mob mob, ServerLevelAccessor level, MobSpawnType spawnType, SpawnData spawnData, boolean result) {
-        return result;
-    }
-
-    @Override
-    public void bridge$forge$finalizeSpawnerSpawn(Mob mob, ServerLevelAccessor level, DifficultyInstance difficulty, @Nullable SpawnGroupData spawnData, @Nullable CompoundTag spawnTag) {
-        mob.finalizeSpawn(level, difficulty, MobSpawnType.SPAWNER, spawnData, spawnTag);
     }
 }

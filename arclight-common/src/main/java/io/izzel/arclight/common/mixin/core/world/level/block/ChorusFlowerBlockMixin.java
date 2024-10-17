@@ -30,7 +30,7 @@ public abstract class ChorusFlowerBlockMixin extends BlockMixin {
 
     // @formatter:off
     @Shadow @Final public static IntegerProperty AGE;
-    @Shadow @Final private Block plant;
+    @Shadow @Final private ChorusPlantBlock plant;
     @Shadow private static boolean allNeighborsEmpty(LevelReader worldIn, BlockPos pos, @Nullable Direction excludingSide) { return false; }
     @Shadow protected abstract void placeGrownFlower(Level worldIn, BlockPos pos, int age);
     @Shadow protected abstract void placeDeadFlower(Level worldIn, BlockPos pos);
@@ -45,7 +45,7 @@ public abstract class ChorusFlowerBlockMixin extends BlockMixin {
         BlockPos blockpos = pos.above();
         if (worldIn.isEmptyBlock(blockpos) && blockpos.getY() < 256) {
             int i = state.getValue(AGE);
-            if (i < 5 && this.bridge$forge$onCropsGrowPre(worldIn, blockpos, state, true)) {
+            if (i < 5 && net.minecraftforge.common.ForgeHooks.onCropsGrowPre(worldIn, blockpos, state, true)) {
                 boolean flag = false;
                 boolean flag1 = false;
                 BlockState blockstate = worldIn.getBlockState(pos.below());
@@ -76,7 +76,7 @@ public abstract class ChorusFlowerBlockMixin extends BlockMixin {
 
                 if (flag && allNeighborsEmpty(worldIn, blockpos, (Direction) null) && worldIn.isEmptyBlock(pos.above(2))) {
                     if (CraftEventFactory.handleBlockSpreadEvent(worldIn, pos, blockpos, this.defaultBlockState().setValue(ChorusFlowerBlock.AGE, i), 2)) {
-                        worldIn.setBlock(pos, ChorusPlantBlock.getStateWithConnections(worldIn, pos, this.plant.defaultBlockState()), 2);
+                        worldIn.setBlock(pos, this.plant.getStateForPlacement(worldIn, pos), 2);
                         this.placeGrownFlower(worldIn, blockpos, i);
                     }
                 } else if (i < 4) {
@@ -99,7 +99,7 @@ public abstract class ChorusFlowerBlockMixin extends BlockMixin {
                     }
 
                     if (flag2) {
-                        worldIn.setBlock(pos, ChorusPlantBlock.getStateWithConnections(worldIn, pos, this.plant.defaultBlockState()), 2);
+                        worldIn.setBlock(pos, this.plant.getStateForPlacement(worldIn, pos), 2);
                     } else {
                         if (CraftEventFactory.handleBlockGrowEvent(worldIn, pos, this.defaultBlockState().setValue(ChorusFlowerBlock.AGE, 5), 2)) {
                             this.placeDeadFlower(worldIn, pos);
@@ -110,14 +110,14 @@ public abstract class ChorusFlowerBlockMixin extends BlockMixin {
                         this.placeDeadFlower(worldIn, pos);
                     }
                 }
-                this.bridge$forge$onCropsGrowPost(worldIn, pos, state);
+                net.minecraftforge.common.ForgeHooks.onCropsGrowPost(worldIn, pos, state);
             }
         }
     }
 
     @Inject(method = "onProjectileHit", cancellable = true, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;destroyBlock(Lnet/minecraft/core/BlockPos;ZLnet/minecraft/world/entity/Entity;)Z"))
     private void arclight$hitByProjectile(Level p_51654_, BlockState p_51655_, BlockHitResult result, Projectile projectile, CallbackInfo ci) {
-        if (!CraftEventFactory.callEntityChangeBlockEvent(projectile, result.getBlockPos(), Blocks.AIR.defaultBlockState())) {
+        if (CraftEventFactory.callEntityChangeBlockEvent(projectile, result.getBlockPos(), Blocks.AIR.defaultBlockState()).isCancelled()) {
             ci.cancel();
         }
     }

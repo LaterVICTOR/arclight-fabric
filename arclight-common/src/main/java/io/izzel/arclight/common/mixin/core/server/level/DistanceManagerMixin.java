@@ -32,6 +32,7 @@ public abstract class DistanceManagerMixin implements TicketManagerBridge {
     @Shadow private static int getTicketLevelAt(SortedArraySet<Ticket<?>> p_229844_0_) { return 0; }
     @Shadow @Final public Long2ObjectOpenHashMap<SortedArraySet<Ticket<?>>> tickets;
     @Shadow abstract TickingTracker tickingTracker();
+    @Shadow @Final private Long2ObjectOpenHashMap<SortedArraySet<Ticket<?>>> forcedTickets;
     @Invoker("purgeStaleTickets") public abstract void bridge$tick();
     // @formatter:on
 
@@ -42,7 +43,7 @@ public abstract class DistanceManagerMixin implements TicketManagerBridge {
         }
     }
 
-    @Redirect(method = "runAllUpdates", require = 0, at = @At(value = "INVOKE", remap = false, target = "Ljava/util/Set;forEach(Ljava/util/function/Consumer;)V"))
+    @Redirect(method = "runAllUpdates", at = @At(value = "INVOKE", remap = false, target = "Ljava/util/Set;forEach(Ljava/util/function/Consumer;)V"))
     private void arclight$safeIter(Set<ChunkHolder> instance, Consumer<ChunkHolder> consumer) {
         // Iterate pending chunk updates with protection against concurrent modification exceptions
         var iter = instance.iterator();
@@ -106,8 +107,11 @@ public abstract class DistanceManagerMixin implements TicketManagerBridge {
             this.tickets.remove(chunkPosIn);
         }
         this.ticketTracker.update(chunkPosIn, getTicketLevelAt(ticketSet), false);
-        if (bridge$platform$isTicketForceTick(ticketIn)) {
-            this.bridge$forge$removeForcedTicket(chunkPosIn, ticketIn);
+        if (ticketIn.isForceTicks()) {
+            SortedArraySet<Ticket<?>> tickets = this.forcedTickets.get(chunkPosIn);
+            if (tickets != null) {
+                tickets.remove(ticketIn);
+            }
         }
         return removed;
     }
@@ -125,8 +129,9 @@ public abstract class DistanceManagerMixin implements TicketManagerBridge {
         if (ticketIn.getTicketLevel() < level) {
             this.ticketTracker.update(chunkPosIn, ticketIn.getTicketLevel(), true);
         }
-        if (bridge$platform$isTicketForceTick(ticketIn)) {
-            this.bridge$forge$addForcedTicket(chunkPosIn, ticketIn);
+        if (ticketIn.isForceTicks()) {
+            SortedArraySet<Ticket<?>> tickets = this.forcedTickets.computeIfAbsent(chunkPosIn, e -> SortedArraySet.create(4));
+            tickets.addOrGet(ticketIn);
         }
         return ticketIn == ticket;
     }

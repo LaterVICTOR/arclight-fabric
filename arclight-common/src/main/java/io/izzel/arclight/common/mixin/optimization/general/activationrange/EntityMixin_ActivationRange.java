@@ -1,6 +1,5 @@
 package io.izzel.arclight.common.mixin.optimization.general.activationrange;
 
-import io.izzel.arclight.common.bridge.core.entity.EntityBridge;
 import io.izzel.arclight.common.bridge.core.world.WorldBridge;
 import io.izzel.arclight.common.bridge.optimization.EntityBridge_ActivationRange;
 import io.izzel.arclight.common.mod.ArclightConstants;
@@ -17,12 +16,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Entity.class)
-public abstract class EntityMixin_ActivationRange implements EntityBridge_ActivationRange, EntityBridge {
+public abstract class EntityMixin_ActivationRange implements EntityBridge_ActivationRange {
 
     // @formatter:off
     @Shadow public abstract void refreshDimensions();
     @Shadow public int tickCount;
-    @Shadow public abstract Level level();
+    @Shadow public Level level;
     @Shadow public abstract AABB getBoundingBox();
     @Shadow public abstract void discard();
     // @formatter:on
