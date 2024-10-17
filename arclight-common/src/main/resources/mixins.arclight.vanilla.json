@@ -1,0 +1,37 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.izzel.arclight.common.mixin.vanilla",
+  "target": "@env(DEFAULT)",
+  "setSourceFile": true,
+  "plugin": "io.izzel.arclight.common.mod.ArclightMixinPlugin",
+  "injectors": {
+    "maxShiftBy": 2,
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "conformVisibility": true,
+    "requireAnnotations": false
+  },
+  "mixinPriority": 555,
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "server.Main_ServerShutdownThreadMixin_Vanilla",
+    "server.dedicated.DedicatedServer_ServerInputThreadMixin_Vanilla",
+    "server.dedicated.DedicatedServerMixin_Vanilla",
+    "server.level.ServerPlayerGameMode_Vanilla",
+    "world.entity.EntityMixin_Vanilla",
+    "world.entity.LivingEntityMixin_Vanilla",
+    "world.entity.animal.MushroomCowMixin_Vanilla",
+    "world.entity.animal.frog.TadpoleMixin_Vanilla",
+    "world.entity.monster.ZombieMixin_Vanilla",
+    "world.entity.player.PlayerMixin_Vanilla",
+    "world.entity.player.ServerPlayerMixin_Vanilla",
+    "world.item.ItemStackMixin_Vanilla",
+    "world.level.LevelMixin_Vanilla",
+    "world.level.block.BlockMixin_Vanilla",
+    "world.level.block.RedstoneOreBlockMixin_Vanilla",
+    "world.level.block.entity.AbstractFurnaceBlockEntityMixin_Vanilla",
+    "world.level.levelgen.structure.templatesystem.StructureTemplateMixin_Vanilla"
+  ]
+}
