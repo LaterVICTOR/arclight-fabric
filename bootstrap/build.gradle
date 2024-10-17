@@ -329,14 +329,6 @@ publishing {
             }
         }
     }
-    publications {
-        mavenJava(MavenPublication) {
-            artifactId = 'arclight-forge-' + versionName
-            artifact project(':arclight-forge').tasks.srgJar
-            artifact project(':arclight-forge').tasks.spigotJar
-            artifact project(':arclight-forge').tasks.sourcesJar
-        }
-    }
 }
 
 if ('true'.equalsIgnoreCase(System.getenv('APPVEYOR_REPO_TAG'))) {
