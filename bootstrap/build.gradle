@@ -273,7 +273,7 @@ publishing {
     repositories {
         maven {
             name = "IzzelAliz"
-            url = uri('http://201.106.6.46:8080/' + (project.version.toString().endsWith('SNAPSHOT') ? 'snapshots' : 'releases'))
+            url = uri('https://maven.izzel.io/' + (project.version.toString().endsWith('SNAPSHOT') ? 'snapshots' : 'releases'))
             credentials {
                 username = project.findProperty("mavenUser") ?: System.getenv("ARCLIGHT_USER")
                 password = project.findProperty("mavenToken") ?: System.getenv("ARCLIGHT_TOKEN")
