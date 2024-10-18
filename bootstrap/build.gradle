@@ -165,38 +165,6 @@ tasks.register('forgeJar', Jar) {
     dependsOn(project(':arclight-forge').tasks.reobfJar)
 }
 
-tasks.register('neoforgeJar', Jar) {
-    archiveBaseName.set 'arclight-neoforge-' + minecraftVersion
-    manifest.attributes 'Main-Class': 'io.izzel.arclight.server.Launcher'
-    manifest.attributes 'Implementation-Title': 'Arclight'
-    manifest.attributes 'Implementation-Version': "arclight-$minecraftVersion-${project.version}-$gitHash"
-    manifest.attributes 'Implementation-Vendor': 'Arclight Team'
-    manifest.attributes 'Implementation-Timestamp': new Date().format("yyyy-MM-dd HH:mm:ss")
-    manifest.attributes 'Automatic-Module-Name': 'arclight.boot'
-    from(configurations.embed.collect { it.isDirectory() ? it : zipTree(it) }) {
-        exclude "META-INF/MANIFEST.MF"
-        exclude "META-INF/*.SF"
-        exclude "META-INF/*.DSA"
-        exclude "META-INF/*.RSA"
-        exclude "LICENSE.txt"
-        exclude "META-INF/services/**"
-        exclude "org/apache/commons/lang/enum/**"
-    }
-    into('/') {
-        it.from(project(':arclight-neoforge').tasks.reobfJar.outputs.files.collect())
-        it.rename { name -> 'common.jar' }
-    }
-    into('/') {
-        it.from(configurations.gson.collect())
-        it.rename { name -> 'gson.jar' }
-    }
-    from sourceSets.applaunch.output
-    from sourceSets.main.output
-    from sourceSets.neoforge.output
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    dependsOn(project(':arclight-neoforge').tasks.reobfJar)
-}
-
 tasks.register('fabricJar', Jar) {
     archiveBaseName.set 'arclight-fabric-' + minecraftVersion
     manifest.attributes 'Main-Class': 'io.izzel.arclight.server.Launcher'
