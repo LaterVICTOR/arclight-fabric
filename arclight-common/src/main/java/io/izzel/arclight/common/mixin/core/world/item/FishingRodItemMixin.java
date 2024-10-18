@@ -25,7 +25,11 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 
 @Mixin(FishingRodItem.class)
-public class FishingRodItemMixin extends ItemMixin {
+public class FishingRodItemMixin extends Item {
+
+    public FishingRodItemMixin(Properties properties) {
+        super(properties);
+    }
 
     /**
      * @author IzzelAliz
@@ -37,13 +41,9 @@ public class FishingRodItemMixin extends ItemMixin {
         if (playerIn.fishing != null) {
             if (!worldIn.isClientSide) {
                 int i = playerIn.fishing.retrieve(itemstack);
-                ItemStack original = itemstack.copy();
                 itemstack.hurtAndBreak(i, playerIn, (player) -> {
                     player.broadcastBreakEvent(handIn);
                 });
-                if (itemstack.isEmpty()) {
-                    this.bridge$forge$onPlayerDestroyItem(playerIn, original, handIn);
-                }
             }
 
             playerIn.swing(handIn);
@@ -69,7 +69,7 @@ public class FishingRodItemMixin extends ItemMixin {
             }
 
             // playerIn.swingArm(handIn);
-            playerIn.awardStat(Stats.ITEM_USED.get((Item) (Object) this));
+            playerIn.awardStat(Stats.ITEM_USED.get(this));
             playerIn.gameEvent(GameEvent.ITEM_INTERACT_START);
         }
 

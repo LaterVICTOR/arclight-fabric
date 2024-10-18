@@ -3,7 +3,7 @@ package io.izzel.arclight.common.mixin.core.world;
 import io.izzel.arclight.common.bridge.core.inventory.IInventoryBridge;
 import io.izzel.arclight.common.mod.inventory.SideViewingTracker;
 import net.minecraft.world.Container;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.Recipe;
 import org.bukkit.Location;
 import org.bukkit.craftbukkit.v.entity.CraftHumanEntity;
 import org.bukkit.entity.HumanEntity;
@@ -45,11 +45,11 @@ public interface ContainerMixin extends IInventoryBridge {
     }
 
     @Override
-    default RecipeHolder<?> getCurrentRecipe() {
+    default Recipe<?> getCurrentRecipe() {
         return null;
     }
 
     @Override
-    default void setCurrentRecipe(RecipeHolder<?> recipe) {
+    default void setCurrentRecipe(Recipe<?> recipe) {
     }
 }

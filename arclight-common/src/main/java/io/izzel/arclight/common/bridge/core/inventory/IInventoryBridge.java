@@ -3,7 +3,7 @@ package io.izzel.arclight.common.bridge.core.inventory;
 import io.izzel.arclight.common.mod.util.WrappedContents;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.Recipe;
 import org.bukkit.Location;
 import org.bukkit.craftbukkit.v.entity.CraftHumanEntity;
 import org.bukkit.craftbukkit.v.inventory.CraftInventory;
@@ -35,11 +35,11 @@ public interface IInventoryBridge {
 
     Location getLocation();
 
-    default RecipeHolder<?> getCurrentRecipe() {
+    default Recipe<?> getCurrentRecipe() {
         return null;
     }
 
-    default void setCurrentRecipe(RecipeHolder<?> recipe) {
+    default void setCurrentRecipe(Recipe<?> recipe) {
     }
 
     default Inventory getOwnerInventory() {
@@ -47,6 +47,7 @@ public interface IInventoryBridge {
         if (owner != null) {
             return owner.getInventory();
         } else {
+            // ArclightMod.LOGGER.warn("No owner for inventory {}/{}", this, this.getClass());
             return new CraftInventory((Container) this);
         }
     }

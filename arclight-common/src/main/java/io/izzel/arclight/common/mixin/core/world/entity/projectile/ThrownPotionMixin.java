@@ -6,7 +6,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.AreaEffectCloud;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -18,16 +17,13 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CampfireBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.HitResult;
 import org.bukkit.craftbukkit.v.entity.CraftLivingEntity;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.LingeringPotionSplashEvent;
 import org.bukkit.event.entity.PotionSplashEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -42,22 +38,9 @@ import java.util.Map;
 @Mixin(ThrownPotion.class)
 public abstract class ThrownPotionMixin extends ThrowableItemProjectileMixin {
 
-    @Unique private transient HitResult arclight$hitResult;
-
     @Redirect(method = "onHit", at = @At(value = "INVOKE", remap = false, ordinal = 1, target = "Ljava/util/List;isEmpty()Z"))
-    private boolean arclight$callEvent(List list, HitResult hitResult) {
-        arclight$hitResult = hitResult;
+    private boolean arclight$callEvent(List list) {
         return false;
-    }
-
-    @Inject(method = "onHit", at = @At("RETURN"))
-    private void arclight$resetResult(HitResult p_37543_, CallbackInfo ci) {
-        arclight$hitResult = null;
-    }
-
-    @Inject(method = "onHit", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/projectile/ThrownPotion;discard()V"))
-    private void arclight$hitCause(HitResult hitResult, CallbackInfo ci) {
-        this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.HIT);
     }
 
     /**
@@ -67,7 +50,7 @@ public abstract class ThrownPotionMixin extends ThrowableItemProjectileMixin {
     @Overwrite
     private void applySplash(List<MobEffectInstance> list, @Nullable Entity entity) {
         AABB axisalignedbb = this.getBoundingBox().inflate(4.0, 2.0, 4.0);
-        List<LivingEntity> list2 = this.level().getEntitiesOfClass(LivingEntity.class, axisalignedbb);
+        List<LivingEntity> list2 = this.level.getEntitiesOfClass(LivingEntity.class, axisalignedbb);
         Map<org.bukkit.entity.LivingEntity, Double> affected = new HashMap<>();
         if (!list2.isEmpty()) {
             for (LivingEntity entityliving : list2) {
@@ -84,7 +67,7 @@ public abstract class ThrownPotionMixin extends ThrowableItemProjectileMixin {
                 }
             }
         }
-        PotionSplashEvent event = CraftEventFactory.callPotionSplashEvent((ThrownPotion) (Object) this, arclight$hitResult, affected);
+        PotionSplashEvent event = CraftEventFactory.callPotionSplashEvent((ThrownPotion) (Object) this, affected);
         if (!event.isCancelled() && list != null && !list.isEmpty()) {
             for (org.bukkit.entity.LivingEntity victim : event.getAffectedEntities()) {
                 if (!(victim instanceof CraftLivingEntity)) {
@@ -94,9 +77,12 @@ public abstract class ThrownPotionMixin extends ThrowableItemProjectileMixin {
                 double d2 = event.getIntensity(victim);
                 for (MobEffectInstance mobeffect : list) {
                     MobEffect mobeffectlist = mobeffect.getEffect();
-                    if (!((WorldBridge) this.level()).bridge$isPvpMode() && this.getOwner() instanceof ServerPlayer && entityliving2 instanceof ServerPlayer && entityliving2 != this.getOwner()) {
-                        if (mobeffectlist == MobEffects.MOVEMENT_SLOWDOWN || mobeffectlist == MobEffects.DIG_SLOWDOWN || mobeffectlist == MobEffects.HARM || mobeffectlist == MobEffects.BLINDNESS
-                            || mobeffectlist == MobEffects.HUNGER || mobeffectlist == MobEffects.WEAKNESS || mobeffectlist == MobEffects.POISON) {
+                    if (!((WorldBridge) this.level).bridge$isPvpMode() && this.getOwner() instanceof ServerPlayer && entityliving2 instanceof ServerPlayer && entityliving2 != this.getOwner()) {
+                        int i = MobEffect.getId(mobeffectlist);
+                        if (i == 2 || i == 4 || i == 7 || i == 15 || i == 17 || i == 18) {
+                            continue;
+                        }
+                        if (i == 19) {
                             continue;
                         }
                     }
@@ -117,30 +103,30 @@ public abstract class ThrownPotionMixin extends ThrowableItemProjectileMixin {
 
     @Inject(method = "makeAreaOfEffectCloud", cancellable = true, locals = LocalCapture.CAPTURE_FAILHARD, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;addFreshEntity(Lnet/minecraft/world/entity/Entity;)Z"))
     private void arclight$makeCloud(ItemStack p_190542_1_, Potion p_190542_2_, CallbackInfo ci, AreaEffectCloud entity) {
-        LingeringPotionSplashEvent event = CraftEventFactory.callLingeringPotionSplashEvent((ThrownPotion) (Object) this, arclight$hitResult, entity);
+        LingeringPotionSplashEvent event = CraftEventFactory.callLingeringPotionSplashEvent((ThrownPotion) (Object) this, entity);
         if (event.isCancelled() || entity.isRemoved()) {
             ci.cancel();
             entity.discard();
         }
     }
 
-    @Inject(method = "dowseFire", cancellable = true, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;destroyBlock(Lnet/minecraft/core/BlockPos;ZLnet/minecraft/world/entity/Entity;)Z"))
+    @Inject(method = "dowseFire", cancellable = true, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;removeBlock(Lnet/minecraft/core/BlockPos;Z)Z"))
     private void arclight$entityChangeBlock(BlockPos pos, CallbackInfo ci) {
-        if (!CraftEventFactory.callEntityChangeBlockEvent((ThrownPotion) (Object) this, pos, Blocks.AIR.defaultBlockState())) {
+        if (CraftEventFactory.callEntityChangeBlockEvent((ThrownPotion) (Object) this, pos, Blocks.AIR.defaultBlockState()).isCancelled()) {
             ci.cancel();
         }
     }
 
     @Inject(method = "dowseFire", cancellable = true, locals = LocalCapture.CAPTURE_FAILHARD, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;levelEvent(Lnet/minecraft/world/entity/player/Player;ILnet/minecraft/core/BlockPos;I)V"))
     private void arclight$entityChangeBlock2(BlockPos pos, CallbackInfo ci, BlockState state) {
-        if (!CraftEventFactory.callEntityChangeBlockEvent((ThrownPotion) (Object) this, pos, state.setValue(CampfireBlock.LIT, false))) {
+        if (CraftEventFactory.callEntityChangeBlockEvent((ThrownPotion) (Object) this, pos, state.setValue(CampfireBlock.LIT, false)).isCancelled()) {
             ci.cancel();
         }
     }
 
     @Inject(method = "dowseFire", cancellable = true, locals = LocalCapture.CAPTURE_FAILHARD, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/AbstractCandleBlock;extinguish(Lnet/minecraft/world/entity/player/Player;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/LevelAccessor;Lnet/minecraft/core/BlockPos;)V"))
     private void arclight$entityChangeBlock3(BlockPos pos, CallbackInfo ci, BlockState state) {
-        if (!CraftEventFactory.callEntityChangeBlockEvent((ThrownPotion) (Object) this, pos, state.setValue(AbstractCandleBlock.LIT, false))) {
+        if (CraftEventFactory.callEntityChangeBlockEvent((ThrownPotion) (Object) this, pos, state.setValue(AbstractCandleBlock.LIT, false)).isCancelled()) {
             ci.cancel();
         }
     }

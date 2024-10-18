@@ -3,10 +3,6 @@ package io.izzel.arclight.common.mixin.bukkit;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.izzel.arclight.common.bridge.bukkit.ItemMetaBridge;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.Tag;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.logging.log4j.LogManager;
 import org.bukkit.craftbukkit.v.inventory.CraftMetaItem;
@@ -14,7 +10,6 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Desc;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -27,12 +22,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.Tag;
 
 @Mixin(value = CraftMetaItem.class, remap = false)
 public class CraftMetaItemMixin implements ItemMetaBridge {
 
     // @formatter:off
-    @Shadow(remap = false) @Final Map<String, Tag> unhandledTags;
+    @Shadow(remap = false) @Final private Map<String, Tag> unhandledTags;
     @Shadow(remap = false) private CompoundTag internalTag;
     // @formatter:on
 
@@ -61,13 +59,10 @@ public class CraftMetaItemMixin implements ItemMetaBridge {
         "Effects",
         "LodestoneDimension",
         "LodestonePos",
-        "LodestoneTracked",
-        "Items",
-        "instrument"
+        "LodestoneTracked"
     );
 
-    @Desc(id = "compoundInit", value = "<init>", args = CompoundTag.class)
-    @ModifyVariable(method = "@Desc(compoundInit)", at = @At(value = "INVOKE", target = "Lorg/bukkit/UnsafeValues;getDataVersion()I"), argsOnly = true)
+    @ModifyVariable(method = "<init>(Lnet/minecraft/nbt/CompoundTag;)V", at = @At(value = "INVOKE", target = "Lorg/bukkit/UnsafeValues;getDataVersion()I"))
     private CompoundTag arclight$provideTag(CompoundTag tag) {
         return tag == null ? new CompoundTag() : tag;
     }
@@ -79,7 +74,8 @@ public class CraftMetaItemMixin implements ItemMetaBridge {
             // force internal tags to be deserialized into item nbt to avoid their vanilla tags being ignored by Bukkit.
             // e.g. apotheosis:potion_charm{"Potion": "<effect id>"} or minecraft:bread{"Potion": "<effect id>"}
             return false;
-        } else {
+        }
+        else {
             // For items that has corresponding ItemMeta representation in Bukkit,
             // keep their behavior unchanged.
             return handledTags.contains((String) key);
@@ -128,7 +124,7 @@ public class CraftMetaItemMixin implements ItemMetaBridge {
         }
     }
 
-    @Inject(method = "clone*", locals = LocalCapture.CAPTURE_FAILHARD, at = @At("RETURN"))
+    @Inject(method = "clone", locals = LocalCapture.CAPTURE_FAILHARD, at = @At("RETURN"))
     private void arclight$cloneTags(CallbackInfoReturnable<CraftMetaItem> cir, CraftMetaItem clone) {
         if (this.unhandledTags != null) {
             ((ItemMetaBridge) clone).bridge$getUnhandledTags().putAll(this.unhandledTags);
@@ -170,7 +166,7 @@ public class CraftMetaItemMixin implements ItemMetaBridge {
             Object forgeCaps = map.get("forgeCaps");
             try {
                 ByteArrayInputStream buf = new ByteArrayInputStream(Base64.decodeBase64(forgeCaps.toString()));
-                this.forgeCaps = NbtIo.readCompressed(buf, NbtAccounter.unlimitedHeap());
+                this.forgeCaps = NbtIo.readCompressed(buf);
             } catch (IOException e) {
                 LogManager.getLogger(getClass()).error("Reading forge caps", e);
             }

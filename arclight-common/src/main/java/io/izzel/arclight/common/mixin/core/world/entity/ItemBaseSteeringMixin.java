@@ -13,6 +13,7 @@ public class ItemBaseSteeringMixin {
     // @formatter:off
     @Shadow public boolean boosting;
     @Shadow public int boostTime;
+    @Shadow public int boostTimeTotal;
     @Shadow @Final private SynchedEntityData entityData;
     @Shadow @Final private EntityDataAccessor<Integer> boostTimeAccessor;
     // @formatter:on
@@ -20,6 +21,7 @@ public class ItemBaseSteeringMixin {
     public void setBoostTicks(int ticks) {
         this.boosting = true;
         this.boostTime = 0;
-        this.entityData.set(this.boostTimeAccessor, ticks);
+        this.boostTimeTotal = ticks;
+        this.entityData.set(this.boostTimeAccessor, this.boostTimeTotal);
     }
 }

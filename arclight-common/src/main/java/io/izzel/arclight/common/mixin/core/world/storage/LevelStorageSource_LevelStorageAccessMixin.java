@@ -17,9 +17,18 @@ import java.nio.file.Path;
 @Mixin(LevelStorageSource.LevelStorageAccess.class)
 public class LevelStorageSource_LevelStorageAccessMixin implements LevelStorageSourceBridge.LevelStorageAccessBridge {
 
-    @Shadow @Final public LevelStorageSource.LevelDirectory levelDirectory;
+    @Shadow @Final LevelStorageSource.LevelDirectory levelDirectory;
 
     public ResourceKey<LevelStem> dimensionType;
+
+    public void arclight$constructor(LevelStorageSource saveFormat, String saveName) {
+        throw new RuntimeException();
+    }
+
+    public void arclight$constructor(LevelStorageSource saveFormat, String saveName, ResourceKey<LevelStem> dimensionType) {
+        arclight$constructor(saveFormat, saveName);
+        this.dimensionType = dimensionType;
+    }
 
     @Override
     public void bridge$setDimType(ResourceKey<LevelStem> typeKey) {

@@ -10,11 +10,8 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import org.bukkit.craftbukkit.v.entity.CraftLivingEntity;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
-import org.bukkit.event.player.PlayerExpCooldownChangeEvent;
-import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
@@ -38,21 +35,6 @@ public abstract class ExperienceOrbMixin extends EntityMixin {
     // @formatter:on
 
     private transient Player arclight$lastPlayer;
-
-    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/ExperienceOrb;discard()V"))
-    private void arclight$tickDespawn(CallbackInfo ci) {
-        this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.DESPAWN);
-    }
-
-    @Inject(method = "merge", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/ExperienceOrb;discard()V"))
-    private void arclight$merge(CallbackInfo ci) {
-        this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.MERGE);
-    }
-
-    @Inject(method = "playerTouch", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/ExperienceOrb;discard()V"))
-    private void arclight$pickup(CallbackInfo ci) {
-        this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.PICKUP);
-    }
 
     @Inject(method = "tick", at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lnet/minecraft/world/entity/Entity;tick()V"))
     private void arclight$captureLast(CallbackInfo ci) {
@@ -85,11 +67,6 @@ public abstract class ExperienceOrbMixin extends EntityMixin {
         player.giveExperiencePoints(CraftEventFactory.callPlayerExpChangeEvent(player, amount).getAmount());
     }
 
-    @Redirect(method = "playerTouch", at = @At(value = "FIELD", opcode = Opcodes.PUTFIELD, target = "Lnet/minecraft/world/entity/player/Player;takeXpDelay:I"))
-    private void arclight$cooldown(Player instance, int value) {
-        instance.takeXpDelay = CraftEventFactory.callPlayerXpCooldownEvent(instance, value, PlayerExpCooldownChangeEvent.ChangeReason.PICKUP_ORB).getNewCooldown();
-    }
-
     /**
      * @author IzzelAliz
      * @reason
@@ -100,7 +77,7 @@ public abstract class ExperienceOrbMixin extends EntityMixin {
 
         if (entry != null) {
             ItemStack itemstack = entry.getValue();
-            int j = Math.min(this.xpToDurability(i), itemstack.getDamageValue());
+            int j = Math.min(this.xpToDurability(this.value), itemstack.getDamageValue());
             // CraftBukkit start
             org.bukkit.event.player.PlayerItemMendEvent event = CraftEventFactory.callPlayerItemMendEvent(player, (ExperienceOrb) (Object) this, itemstack, entry.getKey(), j);
             j = event.getRepairAmount();
@@ -140,5 +117,10 @@ public abstract class ExperienceOrbMixin extends EntityMixin {
         if (expValue > 9923) { cir.setReturnValue(9923); return; }
         if (expValue > 4957) { cir.setReturnValue(4957); }
         // @formatter:on
+    }
+
+    @Override
+    public void burn(float amount) {
+        this.hurt(DamageSource.IN_FIRE, amount);
     }
 }

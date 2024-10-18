@@ -1,6 +1,6 @@
 package io.izzel.arclight.common.mixin.core.world.entity.npc;
 
-import io.izzel.arclight.common.bridge.core.world.item.MerchantOfferBridge;
+import io.izzel.arclight.common.bridge.core.item.MerchantOfferBridge;
 import io.izzel.arclight.common.bridge.core.world.WorldBridge;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LightningBolt;
@@ -11,7 +11,6 @@ import org.bukkit.craftbukkit.v.event.CraftEventFactory;
 import org.bukkit.entity.Villager;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.EntityTransformEvent;
 import org.bukkit.event.entity.VillagerReplenishTradeEvent;
 import org.spongepowered.asm.mixin.Mixin;
@@ -53,7 +52,6 @@ public abstract class VillagerMixin extends AbstractVillagerMixin {
             ci.cancel();
         } else {
             ((WorldBridge) serverWorld).bridge$pushAddEntityReason(CreatureSpawnEvent.SpawnReason.LIGHTNING);
-            this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.TRANSFORMATION);
         }
     }
 

@@ -1,6 +1,5 @@
 package io.izzel.arclight.common.mixin.core.network.protocol.game;
 
-import io.izzel.arclight.common.mod.mixins.annotation.CreateConstructor;
 import it.unimi.dsi.fastutil.shorts.ShortSet;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
@@ -14,12 +13,13 @@ import org.spongepowered.asm.mixin.Shadow;
 public class ClientboundSectionBlocksUpdatePacketMixin {
 
     @Shadow @Final @Mutable private SectionPos sectionPos;
+    @Shadow @Final @Mutable private boolean suppressLightUpdates;
     @Shadow @Final @Mutable private short[] positions;
     @Shadow @Final @Mutable private BlockState[] states;
 
-    @CreateConstructor
-    public void arclight$constructor(SectionPos sectionposition, ShortSet shortset, BlockState[] states) {
+    public void arclight$constructor(SectionPos sectionposition, ShortSet shortset, BlockState[] states, boolean flag) {
         this.sectionPos = sectionposition;
+        this.suppressLightUpdates = flag;
         this.positions = shortset.toShortArray();
         this.states = states;
     }

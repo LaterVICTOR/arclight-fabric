@@ -6,11 +6,9 @@ import net.minecraft.world.entity.projectile.WitherSkull;
 import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.EntityHitResult;
-import net.minecraft.world.phys.HitResult;
 import org.bukkit.Bukkit;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.ExplosionPrimeEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,11 +18,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(WitherSkull.class)
 public abstract class WitherSkullMixin extends AbstractHurtingProjectileMixin {
-
-    @Inject(method = "onHit", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/projectile/WitherSkull;discard()V"))
-    private void arclight$hitCause(HitResult hitResult, CallbackInfo ci) {
-        this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.HIT);
-    }
 
     @Inject(method = "onHitEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;heal(F)V"))
     private void arclight$heal(EntityHitResult result, CallbackInfo ci) {
@@ -36,12 +29,12 @@ public abstract class WitherSkullMixin extends AbstractHurtingProjectileMixin {
         ((LivingEntityBridge) result.getEntity()).bridge$pushEffectCause(EntityPotionEffectEvent.Cause.ATTACK);
     }
 
-    @Redirect(method = "onHit", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;explode(Lnet/minecraft/world/entity/Entity;DDDFZLnet/minecraft/world/level/Level$ExplosionInteraction;)Lnet/minecraft/world/level/Explosion;"))
-    private Explosion arclight$explode(Level world, Entity entityIn, double xIn, double yIn, double zIn, float explosionRadius, boolean causesFire, Level.ExplosionInteraction interaction) {
+    @Redirect(method = "onHit", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;explode(Lnet/minecraft/world/entity/Entity;DDDFZLnet/minecraft/world/level/Explosion$BlockInteraction;)Lnet/minecraft/world/level/Explosion;"))
+    private Explosion arclight$explode(Level world, Entity entityIn, double xIn, double yIn, double zIn, float explosionRadius, boolean causesFire, Explosion.BlockInteraction modeIn) {
         ExplosionPrimeEvent event = new ExplosionPrimeEvent(this.getBukkitEntity(), explosionRadius, causesFire);
         Bukkit.getPluginManager().callEvent(event);
         if (!event.isCancelled()) {
-            return this.level().explode((WitherSkull) (Object) this, xIn, yIn, zIn, event.getRadius(), event.getFire(), interaction);
+            return this.level.explode((WitherSkull) (Object) this, xIn, yIn, zIn, event.getRadius(), event.getFire(), modeIn);
         }
         return null;
     }

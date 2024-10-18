@@ -3,7 +3,7 @@ package io.izzel.arclight.common.mixin.core.world.entity;
 import com.google.common.collect.Lists;
 import io.izzel.arclight.common.bridge.core.entity.AreaEffectCloudEntityBridge;
 import io.izzel.arclight.common.bridge.core.entity.LivingEntityBridge;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Registry;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -18,7 +18,6 @@ import net.minecraft.world.item.alchemy.PotionUtils;
 import org.bukkit.craftbukkit.v.entity.CraftLivingEntity;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
 import org.bukkit.event.entity.AreaEffectCloudApplyEvent;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -62,7 +61,7 @@ public abstract class AreaEffectCloudEntityMixin extends EntityMixin implements 
         super.tick();
         boolean flag = this.isWaiting();
         float f = this.getRadius();
-        if (this.level().isClientSide) {
+        if (this.level.isClientSide) {
             if (flag && this.random.nextBoolean()) {
                 return;
             }
@@ -104,11 +103,10 @@ public abstract class AreaEffectCloudEntityMixin extends EntityMixin implements 
                     d7 = (float) (k & 255) / 255.0F;
                 }
 
-                this.level().addAlwaysVisibleParticle(particleoptions, d0, d2, d4, d5, d6, d7);
+                this.level.addAlwaysVisibleParticle(particleoptions, d0, d2, d4, d5, d6, d7);
             }
         } else {
             if (this.tickCount >= this.waitTime + this.duration) {
-                this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.DESPAWN);
                 this.discard();
                 return;
             }
@@ -125,7 +123,6 @@ public abstract class AreaEffectCloudEntityMixin extends EntityMixin implements 
             if (this.radiusPerTick != 0.0F) {
                 f += this.radiusPerTick;
                 if (f < 0.5F) {
-                    this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.DESPAWN);
                     this.discard();
                     return;
                 }
@@ -147,7 +144,7 @@ public abstract class AreaEffectCloudEntityMixin extends EntityMixin implements 
                 if (list.isEmpty()) {
                     this.victims.clear();
                 } else {
-                    List<LivingEntity> list1 = this.level().getEntitiesOfClass(LivingEntity.class, this.getBoundingBox());
+                    List<LivingEntity> list1 = this.level.getEntitiesOfClass(LivingEntity.class, this.getBoundingBox());
                     if (!list1.isEmpty()) {
                         List<org.bukkit.entity.LivingEntity> entities = new java.util.ArrayList<org.bukkit.entity.LivingEntity>(); // CraftBukkit
                         for (LivingEntity livingentity : list1) {
@@ -179,7 +176,6 @@ public abstract class AreaEffectCloudEntityMixin extends EntityMixin implements 
                                     if (this.radiusOnUse != 0.0F) {
                                         f += this.radiusOnUse;
                                         if (f < 0.5F) {
-                                            this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.DESPAWN);
                                             this.discard();
                                             return;
                                         }
@@ -190,7 +186,6 @@ public abstract class AreaEffectCloudEntityMixin extends EntityMixin implements 
                                     if (this.durationOnUse != 0) {
                                         this.duration += this.durationOnUse;
                                         if (this.duration <= 0) {
-                                            this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.DESPAWN);
                                             this.discard();
                                             return;
                                         }
@@ -213,11 +208,11 @@ public abstract class AreaEffectCloudEntityMixin extends EntityMixin implements 
     }
 
     public String getPotionType() {
-        return BuiltInRegistries.POTION.getKey(this.potion).toString();
+        return Registry.POTION.getKey(this.potion).toString();
     }
 
     public void setPotionType(final String string) {
-        this.setPotion(BuiltInRegistries.POTION.get(new ResourceLocation(string)));
+        this.setPotion(Registry.POTION.get(new ResourceLocation(string)));
     }
 
     @Override

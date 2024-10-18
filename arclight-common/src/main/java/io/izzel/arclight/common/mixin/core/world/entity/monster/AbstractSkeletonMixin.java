@@ -1,5 +1,6 @@
 package io.izzel.arclight.common.mixin.core.world.entity.monster;
 
+import io.izzel.arclight.common.bridge.core.entity.EntityBridge;
 import io.izzel.arclight.common.mixin.core.world.entity.PathfinderMobMixin;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionHand;
@@ -27,7 +28,7 @@ public abstract class AbstractSkeletonMixin extends PathfinderMobMixin {
             ci.cancel();
             return;
         }
-        if (event.getProjectile() != arrowEntity.bridge$getBukkitEntity()) {
+        if (event.getProjectile() != ((EntityBridge) arrowEntity).bridge$getBukkitEntity()) {
             this.playSound(SoundEvents.SKELETON_SHOOT, 1.0F, 1.0F / (this.getRandom().nextFloat() * 0.4F + 0.8F));
             ci.cancel();
         }

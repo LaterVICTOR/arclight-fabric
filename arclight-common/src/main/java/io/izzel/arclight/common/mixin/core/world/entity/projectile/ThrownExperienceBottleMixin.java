@@ -7,7 +7,6 @@ import net.minecraft.world.item.alchemy.PotionUtils;
 import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.phys.HitResult;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.ExpBottleEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -22,15 +21,14 @@ public abstract class ThrownExperienceBottleMixin extends ThrowableItemProjectil
     @Overwrite
     protected void onHit(HitResult result) {
         super.onHit(result);
-        if (!this.level().isClientSide) {
-            int i = 3 + this.level().random.nextInt(5) + this.level().random.nextInt(5);
-            ExpBottleEvent event = CraftEventFactory.callExpBottleEvent((ThrownExperienceBottle) (Object) this, result, i);
+        if (!this.level.isClientSide) {
+            int i = 3 + this.level.random.nextInt(5) + this.level.random.nextInt(5);
+            ExpBottleEvent event = CraftEventFactory.callExpBottleEvent((ThrownExperienceBottle) (Object) this, i);
             i = event.getExperience();
             if (event.getShowEffect()) {
-                this.level().levelEvent(2002, this.blockPosition(), PotionUtils.getColor(Potions.WATER));
+                this.level.levelEvent(2002, this.blockPosition(), PotionUtils.getColor(Potions.WATER));
             }
-            ExperienceOrb.award((ServerLevel) this.level(), this.position(), i);
-            this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.HIT);
+            ExperienceOrb.award((ServerLevel) this.level, this.position(), i);
             this.discard();
         }
     }

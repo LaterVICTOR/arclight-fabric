@@ -4,7 +4,8 @@ import io.izzel.arclight.common.bridge.core.entity.EntityBridge;
 import io.izzel.arclight.common.bridge.core.entity.LivingEntityBridge;
 import io.izzel.arclight.common.bridge.core.entity.MobEntityBridge;
 import io.izzel.arclight.common.bridge.core.world.WorldBridge;
-import io.izzel.arclight.common.mod.server.ArclightServer;
+import io.izzel.arclight.common.mod.ArclightMod;
+import io.izzel.arclight.mixin.Eject;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundSetEntityLinkPacket;
 import net.minecraft.resources.ResourceLocation;
@@ -20,30 +21,30 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.common.ForgeHooks;
+import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.craftbukkit.v.entity.CraftLivingEntity;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityCombustByEntityEvent;
-import org.bukkit.event.entity.EntityKnockbackEvent;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 import org.bukkit.event.entity.EntityTransformEvent;
 import org.bukkit.event.entity.EntityUnleashEvent;
-import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import javax.annotation.Nullable;
+
+import static net.minecraft.world.entity.LivingEntity.getEquipmentSlotForItem;
 
 @Mixin(Mob.class)
 public abstract class MobMixin extends LivingEntityMixin implements MobEntityBridge {
@@ -123,7 +124,7 @@ public abstract class MobMixin extends LivingEntityMixin implements MobEntityBri
                 reason = (this.getTarget().isAlive() ? EntityTargetEvent.TargetReason.FORGOT_TARGET : EntityTargetEvent.TargetReason.TARGET_DIED);
             }
             if (reason == EntityTargetEvent.TargetReason.UNKNOWN) {
-                ArclightServer.LOGGER.warn("Unknown target reason setting {} target to {}", this, livingEntity);
+                ArclightMod.LOGGER.warn("Unknown target reason setting {} target to {}", this, livingEntity);
             }
             CraftLivingEntity ctarget = null;
             if (livingEntity != null) {
@@ -140,14 +141,15 @@ public abstract class MobMixin extends LivingEntityMixin implements MobEntityBri
             } else {
                 livingEntity = null;
             }
-            var newTarget = this.bridge$forge$onLivingChangeTarget((LivingEntity) (Object) this, livingEntity, LivingTargetType.MOB_TARGET);
-            if (newTarget == null) {
+            var changeTargetEvent = ForgeHooks.onLivingChangeTarget((LivingEntity) (Object) this, livingEntity, LivingChangeTargetEvent.LivingTargetType.MOB_TARGET);
+            if (changeTargetEvent.isCanceled()) {
                 arclight$targetSuccess = false;
                 return;
             }
-            livingEntity = newTarget;
+            livingEntity = changeTargetEvent.getNewTarget();
         }
         this.target = livingEntity;
+        ForgeHooks.onLivingSetAttackTarget((Mob) (Object) this, this.target);
         arclight$targetSuccess = true;
     }
 
@@ -175,11 +177,6 @@ public abstract class MobMixin extends LivingEntityMixin implements MobEntityBri
             this.arclight$reason = null;
         }
         arclight$fireEvent = fireEvent;
-    }
-
-    @Redirect(method = "addAdditionalSaveData", at = @At(value = "FIELD", ordinal = 0, opcode = Opcodes.GETFIELD, target = "Lnet/minecraft/world/entity/Mob;leashHolder:Lnet/minecraft/world/entity/Entity;"))
-    private Entity arclight$skipLeaseSave(Mob instance) {
-        return this.pluginRemoved ? null : instance.getLeashHolder();
     }
 
     @Inject(method = "addAdditionalSaveData", at = @At("HEAD"))
@@ -212,11 +209,6 @@ public abstract class MobMixin extends LivingEntityMixin implements MobEntityBri
         arclight$item = itemEntity;
     }
 
-    @Inject(method = "pickUpItem", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/item/ItemEntity;discard()V"))
-    private void arclight$pickupCause(ItemEntity itemEntity, CallbackInfo ci) {
-        itemEntity.bridge().bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.PICKUP);
-    }
-
     @Override
     public void bridge$captureItemDrop(ItemEntity itemEntity) {
         this.arclight$item = itemEntity;
@@ -229,19 +221,12 @@ public abstract class MobMixin extends LivingEntityMixin implements MobEntityBri
      * @reason
      */
     @Overwrite
-    public ItemStack equipItemIfPossible(ItemStack stack) {
+    public boolean equipItemIfPossible(ItemStack stack) {
         ItemEntity itemEntity = arclight$item;
         arclight$item = null;
         EquipmentSlot equipmentslottype = getEquipmentSlotForItem(stack);
         ItemStack itemstack = this.getItemBySlot(equipmentslottype);
         boolean flag = this.canReplaceCurrentItem(stack, itemstack);
-
-        if (equipmentslottype.isArmor() && !flag) {
-            equipmentslottype = EquipmentSlot.MAINHAND;
-            itemstack = this.getItemBySlot(equipmentslottype);
-            flag = itemstack.isEmpty();
-        }
-
         boolean canPickup = flag && this.canHoldItem(stack);
         if (itemEntity != null) {
             canPickup = !CraftEventFactory.callEntityPickupItemEvent((Mob) (Object) this, itemEntity, 0, !canPickup).isCancelled();
@@ -254,16 +239,10 @@ public abstract class MobMixin extends LivingEntityMixin implements MobEntityBri
                 forceDrops = false;
             }
 
-            if (equipmentslottype.isArmor() && stack.getCount() > 1) {
-                ItemStack itemstack1 = stack.copyWithCount(1);
-                this.setItemSlotAndDropWhenKilled(equipmentslottype, itemstack1);
-                return itemstack1;
-            } else {
-                this.setItemSlotAndDropWhenKilled(equipmentslottype, stack);
-                return stack;
-            }
+            this.setItemSlotAndDropWhenKilled(equipmentslottype, stack);
+            return true;
         } else {
-            return ItemStack.EMPTY;
+            return false;
         }
     }
 
@@ -287,11 +266,6 @@ public abstract class MobMixin extends LivingEntityMixin implements MobEntityBri
     public void arclight$unleash2(CallbackInfo ci) {
         Bukkit.getPluginManager().callEvent(new EntityUnleashEvent(this.getBukkitEntity(), this.isAlive() ?
             EntityUnleashEvent.UnleashReason.HOLDER_GONE : EntityUnleashEvent.UnleashReason.PLAYER_UNLEASH));
-    }
-
-    @ModifyArg(method = "tickLeash", index = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Mob;dropLeash(ZZ)V"))
-    private boolean arclight$skipOnPluginRemove(boolean b) {
-        return !this.pluginRemoved;
     }
 
     @Inject(method = "dropLeash", at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lnet/minecraft/world/entity/Mob;spawnAtLocation(Lnet/minecraft/world/level/ItemLike;)Lnet/minecraft/world/entity/item/ItemEntity;"))
@@ -324,41 +298,26 @@ public abstract class MobMixin extends LivingEntityMixin implements MobEntityBri
         Bukkit.getPluginManager().callEvent(new EntityUnleashEvent(this.getBukkitEntity(), EntityUnleashEvent.UnleashReason.UNKNOWN));
     }
 
-    private transient boolean arclight$cancelSpawn;
-
-    @Redirect(method = "convertTo", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;addFreshEntity(Lnet/minecraft/world/entity/Entity;)Z"))
-    private boolean arclight$copySpawn(net.minecraft.world.level.Level world, Entity entityIn) {
+    @Eject(method = "convertTo", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;addFreshEntity(Lnet/minecraft/world/entity/Entity;)Z"))
+    private boolean arclight$copySpawn(net.minecraft.world.level.Level world, Entity entityIn, CallbackInfoReturnable<Mob> cir) {
         EntityTransformEvent.TransformReason transformReason = arclight$transform == null ? EntityTransformEvent.TransformReason.UNKNOWN : arclight$transform;
         arclight$transform = null;
         if (CraftEventFactory.callEntityTransformEvent((Mob) (Object) this, (LivingEntity) entityIn, transformReason).isCancelled()) {
-            arclight$cancelSpawn = true;
+            cir.setReturnValue(null);
             return false;
         } else {
             return world.addFreshEntity(entityIn);
         }
     }
 
-    @Inject(method = "convertTo", cancellable = true, at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lnet/minecraft/world/level/Level;addFreshEntity(Lnet/minecraft/world/entity/Entity;)Z"))
-    private <T extends Mob> void arclight$cancelSpawn(EntityType<T> entityType, boolean bl, CallbackInfoReturnable<T> cir) {
-        if (arclight$cancelSpawn) {
-            cir.setReturnValue(null);
-        }
-        arclight$cancelSpawn = false;
-    }
-
     @Inject(method = "convertTo", at = @At("RETURN"))
     private <T extends Mob> void arclight$cleanReason(EntityType<T> p_233656_1_, boolean p_233656_2_, CallbackInfoReturnable<T> cir) {
-        ((WorldBridge) this.level()).bridge$pushAddEntityReason(null);
+        ((WorldBridge) this.level).bridge$pushAddEntityReason(null);
         this.arclight$transform = null;
     }
 
-    @Inject(method = "convertTo", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Mob;discard()V"))
-    private <T extends Mob> void arclight$transformCause(EntityType<T> entityType, boolean bl, CallbackInfoReturnable<T> cir) {
-        this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.TRANSFORMATION);
-    }
-
     public <T extends Mob> T convertTo(EntityType<T> entityType, boolean flag, EntityTransformEvent.TransformReason transformReason, CreatureSpawnEvent.SpawnReason spawnReason) {
-        ((WorldBridge) this.level()).bridge$pushAddEntityReason(spawnReason);
+        ((WorldBridge) this.level).bridge$pushAddEntityReason(spawnReason);
         bridge$pushTransformReason(transformReason);
         return this.convertTo(entityType, flag);
     }
@@ -372,21 +331,11 @@ public abstract class MobMixin extends LivingEntityMixin implements MobEntityBri
 
     @Redirect(method = "doHurtTarget", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;setSecondsOnFire(I)V"))
     public void arclight$attackCombust(Entity entity, int seconds) {
-        EntityCombustByEntityEvent combustEvent = new EntityCombustByEntityEvent(this.getBukkitEntity(), entity.bridge$getBukkitEntity(), seconds);
+        EntityCombustByEntityEvent combustEvent = new EntityCombustByEntityEvent(this.getBukkitEntity(), ((EntityBridge) entity).bridge$getBukkitEntity(), seconds);
         org.bukkit.Bukkit.getPluginManager().callEvent(combustEvent);
         if (!combustEvent.isCancelled()) {
             ((EntityBridge) entity).bridge$setOnFire(combustEvent.getDuration(), false);
         }
-    }
-
-    @Inject(method = "doHurtTarget", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;knockback(DDD)V"))
-    private void arclight$attackKnockback(Entity entity, CallbackInfoReturnable<Boolean> cir) {
-        ((LivingEntityBridge) entity).bridge$pushKnockbackCause((Entity) (Object) this, EntityKnockbackEvent.KnockbackCause.ENTITY_ATTACK);
-    }
-
-    @Inject(method = "checkDespawn", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Mob;discard()V"))
-    private void arclight$naturalDespawn(CallbackInfo ci) {
-        this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.DESPAWN);
     }
 
     @Override
@@ -406,10 +355,5 @@ public abstract class MobMixin extends LivingEntityMixin implements MobEntityBri
     @Override
     public void bridge$setPersistenceRequired(boolean value) {
         this.setPersistenceRequired(value);
-    }
-
-    @Override
-    public boolean bridge$common$animalTameEvent(Player player) {
-        return !CraftEventFactory.callEntityTameEvent((Mob) (Object) this, player).isCancelled();
     }
 }

@@ -14,7 +14,6 @@ import org.bukkit.craftbukkit.v.CraftServer;
 import org.bukkit.craftbukkit.v.entity.CraftItem;
 import org.bukkit.entity.AbstractArrow;
 import org.bukkit.event.entity.EntityCombustByEntityEvent;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.player.PlayerPickupArrowEvent;
 import org.bukkit.projectiles.ProjectileSource;
 import org.objectweb.asm.Opcodes;
@@ -35,7 +34,6 @@ public abstract class AbstractArrowMixin extends ProjectileMixin {
     @Shadow public int shakeTime;
     @Shadow public net.minecraft.world.entity.projectile.AbstractArrow.Pickup pickup;
     @Shadow protected abstract ItemStack getPickupItem();
-    @Shadow public ItemStack pickupItemStack;
     // @formatter:on
 
     @Redirect(method = "tick", at = @At(value = "INVOKE", opcode = Opcodes.PUTFIELD, target = "Lnet/minecraft/world/entity/projectile/AbstractArrow;onHit(Lnet/minecraft/world/phys/HitResult;)V"))
@@ -52,27 +50,17 @@ public abstract class AbstractArrowMixin extends ProjectileMixin {
         }
     }
 
-    @Inject(method = "onHitEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/projectile/AbstractArrow;discard()V"))
-    private void arclight$hit(CallbackInfo ci) {
-        this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.HIT);
-    }
-
-    @Inject(method = "tickDespawn", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/projectile/AbstractArrow;discard()V"))
-    private void arclight$despawn(CallbackInfo ci) {
-        this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.DESPAWN);
-    }
-
     /**
      * @author IzzelAliz
      * @reason
      */
     @Overwrite
     public void playerTouch(Player playerEntity) {
-        if (!this.level().isClientSide && (this.inGround || this.isNoPhysics()) && this.shakeTime <= 0) {
+        if (!this.level.isClientSide && (this.inGround || this.isNoPhysics()) && this.shakeTime <= 0) {
             ItemStack itemstack = this.getPickupItem();
             if (this.pickup == net.minecraft.world.entity.projectile.AbstractArrow.Pickup.ALLOWED && !itemstack.isEmpty() && ((PlayerInventoryBridge) playerEntity.getInventory()).bridge$canHold(itemstack) > 0) {
-                ItemEntity item = new ItemEntity(this.level(), this.getX(), this.getY(), this.getZ(), itemstack);
-                PlayerPickupArrowEvent event = new PlayerPickupArrowEvent(((ServerPlayerEntityBridge) playerEntity).bridge$getBukkitEntity(), new CraftItem(((CraftServer) Bukkit.getServer()), item), (AbstractArrow) this.getBukkitEntity());
+                ItemEntity item = new ItemEntity(this.level, this.getX(), this.getY(), this.getZ(), itemstack);
+                PlayerPickupArrowEvent event = new PlayerPickupArrowEvent(((ServerPlayerEntityBridge) playerEntity).bridge$getBukkitEntity(), new CraftItem(((CraftServer) Bukkit.getServer()), (net.minecraft.world.entity.projectile.AbstractArrow) (Object) this, item), (AbstractArrow) this.getBukkitEntity());
                 Bukkit.getPluginManager().callEvent(event);
                 if (event.isCancelled()) {
                     return;
@@ -81,7 +69,6 @@ public abstract class AbstractArrowMixin extends ProjectileMixin {
             }
             if ((this.pickup == net.minecraft.world.entity.projectile.AbstractArrow.Pickup.ALLOWED && playerEntity.getInventory().add(itemstack)) || (this.pickup == net.minecraft.world.entity.projectile.AbstractArrow.Pickup.CREATIVE_ONLY && playerEntity.getAbilities().instabuild)) {
                 playerEntity.take((net.minecraft.world.entity.projectile.AbstractArrow) (Object) this, 1);
-                this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.PICKUP);
                 this.discard();
             }
         }

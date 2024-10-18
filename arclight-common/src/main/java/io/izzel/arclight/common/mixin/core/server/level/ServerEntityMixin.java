@@ -1,16 +1,21 @@
 package io.izzel.arclight.common.mixin.core.server.level;
 
+import com.google.common.collect.Lists;
+import com.mojang.datafixers.util.Pair;
 import io.izzel.arclight.common.bridge.core.entity.player.ServerPlayerEntityBridge;
 import io.izzel.arclight.common.bridge.core.world.ServerEntityBridge;
 import io.izzel.arclight.common.mod.ArclightConstants;
-import io.izzel.arclight.common.mod.mixins.annotation.CreateConstructor;
-import io.izzel.arclight.common.mod.mixins.annotation.ShadowConstructor;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundRotateHeadPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEntityLinkPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEquipmentPacket;
 import net.minecraft.network.protocol.game.ClientboundSetPassengersPacket;
 import net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket;
+import net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket;
 import net.minecraft.network.protocol.game.VecDeltaCodec;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerEntity;
@@ -18,8 +23,11 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerPlayerConnection;
 import net.minecraft.util.Mth;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.projectile.AbstractArrow;
@@ -38,17 +46,15 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
-import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 @Mixin(ServerEntity.class)
 public abstract class ServerEntityMixin implements ServerEntityBridge {
@@ -71,8 +77,6 @@ public abstract class ServerEntityMixin implements ServerEntityBridge {
     @Shadow private Vec3 ap;
     @Shadow private int yHeadRotp;
     @Shadow protected abstract void broadcastAndSend(Packet<?> packet);
-    @Shadow @Nullable private List<SynchedEntityData.DataValue<?>> trackedDataValues;
-    @Shadow private static Stream<Entity> removedPassengers(List<Entity> p_277592_, List<Entity> p_277658_) { return null; }
     // @formatter:on
 
     private Set<ServerPlayerConnection> trackedPlayers;
@@ -86,12 +90,10 @@ public abstract class ServerEntityMixin implements ServerEntityBridge {
         lastUpdate = lastPosUpdate = lastMapUpdate = -1;
     }
 
-    @ShadowConstructor
     public void arclight$constructor(ServerLevel serverWorld, Entity entity, int updateFrequency, boolean sendVelocityUpdates, Consumer<Packet<?>> packetConsumer) {
         throw new NullPointerException();
     }
 
-    @CreateConstructor
     public void arclight$constructor(ServerLevel serverWorld, Entity entity, int updateFrequency, boolean sendVelocityUpdates, Consumer<Packet<?>> packetConsumer, Set<ServerPlayerConnection> set) {
         arclight$constructor(serverWorld, entity, updateFrequency, sendVelocityUpdates, packetConsumer);
         this.trackedPlayers = set;
@@ -112,11 +114,6 @@ public abstract class ServerEntityMixin implements ServerEntityBridge {
         if (!list.equals(this.lastPassengers)) {
             this.lastPassengers = list;
             this.broadcastAndSend(new ClientboundSetPassengersPacket(this.entity));
-            removedPassengers(list, this.lastPassengers).forEach((p_289307_) -> {
-                if (p_289307_ instanceof ServerPlayer serverplayer1) {
-                    serverplayer1.connection.teleport(serverplayer1.getX(), serverplayer1.getY(), serverplayer1.getZ(), serverplayer1.getYRot(), serverplayer1.getXRot());
-                }
-            });
         }
         int elapsedTicks = ArclightConstants.currentTick - this.lastTick;
         if (elapsedTicks < 0) {
@@ -146,7 +143,7 @@ public abstract class ServerEntityMixin implements ServerEntityBridge {
                 int l1 = Mth.floor(this.entity.getXRot() * 256.0F / 360.0F);
                 boolean flag2 = Math.abs(i1 - this.yRotp) >= 1 || Math.abs(l1 - this.xRotp) >= 1;
                 if (flag2) {
-                    this.broadcast.accept(new ClientboundMoveEntityPacket.Rot(this.entity.getId(), (byte) i1, (byte) l1, this.entity.onGround()));
+                    this.broadcast.accept(new ClientboundMoveEntityPacket.Rot(this.entity.getId(), (byte) i1, (byte) l1, this.entity.isOnGround()));
                     this.yRotp = i1;
                     this.xRotp = l1;
                 }
@@ -162,31 +159,25 @@ public abstract class ServerEntityMixin implements ServerEntityBridge {
                 Packet<?> ipacket1 = null;
                 boolean flag4 = flag3 || this.tickCount / 60 != this.lastPosUpdate;
                 boolean flag = Math.abs(l - this.yRotp) >= 1 || Math.abs(k1 - this.xRotp) >= 1;
-                boolean pos = false;
-                boolean rot = false;
                 if (this.tickCount > 0 || this.entity instanceof AbstractArrow) {
                     long i = this.positionCodec.encodeX(vector3d);
                     long j = this.positionCodec.encodeY(vector3d);
                     long k = this.positionCodec.encodeZ(vector3d);
                     boolean flag1 = i < -32768L || i > 32767L || j < -32768L || j > 32767L || k < -32768L || k > 32767L;
-                    if (!flag1 && this.teleportDelay <= 400 && !this.wasRiding && this.wasOnGround == this.entity.onGround()) {
+                    if (!flag1 && this.teleportDelay <= 400 && !this.wasRiding && this.wasOnGround == this.entity.isOnGround()) {
                         if ((!flag4 || !flag) && !(this.entity instanceof AbstractArrow)) {
                             if (flag4) {
-                                ipacket1 = new ClientboundMoveEntityPacket.Pos(this.entity.getId(), (short) ((int) i), (short) ((int) j), (short) ((int) k), this.entity.onGround());
-                                pos = true;
+                                ipacket1 = new ClientboundMoveEntityPacket.Pos(this.entity.getId(), (short) ((int) i), (short) ((int) j), (short) ((int) k), this.entity.isOnGround());
                             } else if (flag) {
-                                ipacket1 = new ClientboundMoveEntityPacket.Rot(this.entity.getId(), (byte) l, (byte) k1, this.entity.onGround());
-                                rot = true;
+                                ipacket1 = new ClientboundMoveEntityPacket.Rot(this.entity.getId(), (byte) l, (byte) k1, this.entity.isOnGround());
                             }
                         } else {
-                            ipacket1 = new ClientboundMoveEntityPacket.PosRot(this.entity.getId(), (short) ((int) i), (short) ((int) j), (short) ((int) k), (byte) l, (byte) k1, this.entity.onGround());
-                            pos = rot = true;
+                            ipacket1 = new ClientboundMoveEntityPacket.PosRot(this.entity.getId(), (short) ((int) i), (short) ((int) j), (short) ((int) k), (byte) l, (byte) k1, this.entity.isOnGround());
                         }
                     } else {
-                        this.wasOnGround = this.entity.onGround();
+                        this.wasOnGround = this.entity.isOnGround();
                         this.teleportDelay = 0;
                         ipacket1 = new ClientboundTeleportEntityPacket(this.entity);
-                        pos = rot = true;
                     }
                 }
                 if ((this.trackDelta || this.entity.hasImpulse || this.entity instanceof LivingEntity && ((LivingEntity) this.entity).isFallFlying()) && this.tickCount > 0) {
@@ -201,10 +192,10 @@ public abstract class ServerEntityMixin implements ServerEntityBridge {
                     this.broadcast.accept(ipacket1);
                 }
                 this.sendDirtyEntityData();
-                if (pos) {
+                if (flag4) {
                     this.positionCodec.setBase(vector3d);
                 }
-                if (rot) {
+                if (flag) {
                     this.yRotp = l;
                     this.xRotp = k1;
                 }
@@ -241,25 +232,87 @@ public abstract class ServerEntityMixin implements ServerEntityBridge {
         }
     }
 
+    @Inject(method = "addPairing", at = @At("HEAD"))
+    private void arclight$addPlayer(ServerPlayer player, CallbackInfo ci) {
+        this.arclight$player = player;
+    }
+
+    private transient ServerPlayer arclight$player;
+
+    public void a(final Consumer<Packet<?>> consumer, ServerPlayer playerEntity) {
+        this.arclight$player = playerEntity;
+        this.sendPairingData(consumer);
+    }
+
+    /**
+     * @author IzzelAliz
+     * @reason
+     */
+    @Overwrite
+    public void sendPairingData(final Consumer<Packet<?>> consumer) {
+        ServerPlayer player = arclight$player;
+        arclight$player = null;
+        Mob entityinsentient;
+        if (this.entity.isRemoved()) {
+            return;
+        }
+        Packet<?> packet = this.entity.getAddEntityPacket();
+        this.yHeadRotp = Mth.floor(this.entity.getYHeadRot() * 256.0f / 360.0f);
+        consumer.accept(packet);
+        if (!this.entity.getEntityData().isEmpty()) {
+            consumer.accept(new ClientboundSetEntityDataPacket(this.entity.getId(), this.entity.getEntityData(), true));
+        }
+        boolean flag = this.trackDelta;
+        if (this.entity instanceof LivingEntity livingEntity) {
+            Collection<AttributeInstance> collection = livingEntity.getAttributes().getSyncableAttributes();
+            if (this.entity.getId() == player.getId()) {
+                ((ServerPlayerEntityBridge) this.entity).bridge$getBukkitEntity().injectScaledMaxHealth(collection, false);
+            }
+            if (!collection.isEmpty()) {
+                consumer.accept(new ClientboundUpdateAttributesPacket(this.entity.getId(), collection));
+            }
+            if (livingEntity.isFallFlying()) {
+                flag = true;
+            }
+        }
+        this.ap = this.entity.getDeltaMovement();
+        if (flag && !(this.entity instanceof LivingEntity)) {
+            consumer.accept(new ClientboundSetEntityMotionPacket(this.entity.getId(), this.ap));
+        }
+        if (this.entity instanceof LivingEntity) {
+            ArrayList<Pair<EquipmentSlot, ItemStack>> list = Lists.newArrayList();
+            for (EquipmentSlot enumitemslot : EquipmentSlot.values()) {
+                ItemStack itemstack = ((LivingEntity) this.entity).getItemBySlot(enumitemslot);
+                if (itemstack.isEmpty()) continue;
+                list.add(Pair.of(enumitemslot, itemstack.copy()));
+            }
+            if (!list.isEmpty()) {
+                consumer.accept(new ClientboundSetEquipmentPacket(this.entity.getId(), list));
+            }
+        }
+        this.yHeadRotp = Mth.floor(this.entity.getYHeadRot() * 256.0f / 360.0f);
+        consumer.accept(new ClientboundRotateHeadPacket(this.entity, (byte) this.yHeadRotp));
+        if (this.entity instanceof LivingEntity livingEntity) {
+            for (MobEffectInstance mobeffect : livingEntity.getActiveEffects()) {
+                consumer.accept(new ClientboundUpdateMobEffectPacket(this.entity.getId(), mobeffect));
+            }
+            livingEntity.detectEquipmentUpdates();
+        }
+        if (!this.entity.getPassengers().isEmpty()) {
+            consumer.accept(new ClientboundSetPassengersPacket(this.entity));
+        }
+        if (this.entity.isPassenger()) {
+            consumer.accept(new ClientboundSetPassengersPacket(this.entity.getVehicle()));
+        }
+        if (this.entity instanceof Mob && (entityinsentient = (Mob) this.entity).isLeashed()) {
+            consumer.accept(new ClientboundSetEntityLinkPacket(entityinsentient, entityinsentient.getLeashHolder()));
+        }
+    }
+
     @Inject(method = "sendDirtyEntityData", locals = LocalCapture.CAPTURE_FAILHARD, at = @At(value = "INVOKE", ordinal = 1, target = "Lnet/minecraft/server/level/ServerEntity;broadcastAndSend(Lnet/minecraft/network/protocol/Packet;)V"))
-    private void arclight$sendScaledHealth(CallbackInfo ci, SynchedEntityData entitydatamanager, List<SynchedEntityData.DataValue<?>> list, Set<AttributeInstance> set) {
+    private void arclight$sendScaledHealth(CallbackInfo ci, SynchedEntityData entitydatamanager, Set<AttributeInstance> set) {
         if (this.entity instanceof ServerPlayerEntityBridge player) {
             player.bridge$getBukkitEntity().injectScaledMaxHealth(set, false);
         }
-    }
-
-    @Inject(method = "sendPairingData", cancellable = true, require = 0, at = @At("HEAD"))
-    private void arclight$returnIfRemoved(CallbackInfo ci) {
-        if (this.entity.isRemoved()) {
-            ci.cancel();
-        }
-    }
-
-    @Redirect(method = "sendPairingData", require = 0, at = @At(value = "INVOKE", target = "Ljava/util/Collection;isEmpty()Z"))
-    private boolean arclight$injectScaledHealth(Collection<AttributeInstance> instance, ServerPlayer player) {
-        if (this.entity.getId() == player.getId()) {
-            ((ServerPlayerEntityBridge) this.entity).bridge$getBukkitEntity().injectScaledMaxHealth(instance, false);
-        }
-        return instance.isEmpty();
     }
 }

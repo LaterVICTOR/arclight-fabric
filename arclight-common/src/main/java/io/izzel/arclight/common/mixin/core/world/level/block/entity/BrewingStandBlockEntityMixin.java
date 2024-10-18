@@ -1,8 +1,6 @@
 package io.izzel.arclight.common.mixin.core.world.level.block.entity;
 
 import io.izzel.arclight.common.bridge.core.tileentity.TileEntityBridge;
-import io.izzel.arclight.common.bridge.core.world.WorldBridge;
-import io.izzel.arclight.common.bridge.core.world.item.ItemStackBridge;
 import io.izzel.arclight.common.mod.util.ArclightCaptures;
 import io.izzel.arclight.mixin.Eject;
 import net.minecraft.core.BlockPos;
@@ -12,22 +10,21 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BrewingStandBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.common.brewing.BrewingRecipeRegistry;
+import net.minecraftforge.event.ForgeEventFactory;
 import org.bukkit.Bukkit;
 import org.bukkit.craftbukkit.v.block.CraftBlock;
 import org.bukkit.craftbukkit.v.entity.CraftHumanEntity;
 import org.bukkit.craftbukkit.v.inventory.CraftItemStack;
 import org.bukkit.entity.HumanEntity;
-import org.bukkit.event.block.BrewingStartEvent;
 import org.bukkit.event.inventory.BrewEvent;
 import org.bukkit.event.inventory.BrewingStandFuelEvent;
 import org.bukkit.inventory.BrewerInventory;
 import org.bukkit.inventory.InventoryHolder;
-import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.ArrayList;
@@ -58,25 +55,19 @@ public abstract class BrewingStandBlockEntityMixin extends LockableBlockEntityMi
         }
     }
 
-    @Inject(method = "serverTick", at = @At(value = "FIELD", opcode = Opcodes.PUTFIELD, target = "Lnet/minecraft/world/level/block/entity/BrewingStandBlockEntity;ingredient:Lnet/minecraft/world/item/Item;"))
-    private static void arclight$brewBegin(Level level, BlockPos pos, BlockState p_155288_, BrewingStandBlockEntity entity, CallbackInfo ci) {
-        var event = new BrewingStartEvent(CraftBlock.at(level, pos), CraftItemStack.asCraftMirror(entity.getItem(3)), entity.brewTime);
-        Bukkit.getPluginManager().callEvent(event);
-        entity.brewTime = event.getTotalBrewTime();
-    }
-
     /**
      * @author Izzel_Aliz
      * @reason
      */
     @Overwrite
     private static void doBrew(Level level, BlockPos pos, NonNullList<ItemStack> stacks) {
+        if (ForgeEventFactory.onPotionAttemptBrew(stacks)) return;
         ItemStack ing = stacks.get(3);
 
         List<org.bukkit.inventory.ItemStack> brewResults = new ArrayList<>(3);
         for (int i = 0; i < 3; ++i) {
             var input = stacks.get(i);
-            var output = ((WorldBridge) level).bridge$forge$potionBrewMix(input, ing);
+            var output = BrewingRecipeRegistry.getOutput(input, ing);
             brewResults.add(i, CraftItemStack.asCraftMirror(output.isEmpty() ? input : output));
         }
         BrewingStandBlockEntity entity = ArclightCaptures.getTickingBlockEntity();
@@ -98,14 +89,14 @@ public abstract class BrewingStandBlockEntityMixin extends LockableBlockEntityMi
         }
 
         // BrewingRecipeRegistry.brewPotions(stacks, ing, SLOTS_FOR_SIDES);
-        ((WorldBridge) level).bridge$forge$onPotionBrewed(stacks);
-        if (((ItemStackBridge) (Object) ing).bridge$forge$hasCraftingRemainingItem()) {
-            ItemStack containerItem = ((ItemStackBridge) (Object) ing).bridge$forge$getCraftingRemainingItem();
+        ForgeEventFactory.onPotionBrewed(stacks);
+        if (ing.hasCraftingRemainingItem()) {
+            ItemStack containerItem = ing.getCraftingRemainingItem();
             ing.shrink(1);
             if (ing.isEmpty()) {
                 ing = containerItem;
             } else {
-                Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), containerItem);
+                Containers.dropItemStack(level, (double) pos.getX(), (double) pos.getY(), (double) pos.getZ(), containerItem);
             }
         } else ing.shrink(1);
 

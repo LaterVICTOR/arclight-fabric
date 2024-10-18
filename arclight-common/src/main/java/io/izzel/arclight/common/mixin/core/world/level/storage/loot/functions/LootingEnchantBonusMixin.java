@@ -1,6 +1,5 @@
 package io.izzel.arclight.common.mixin.core.world.level.storage.loot.functions;
 
-import io.izzel.arclight.common.bridge.core.world.storage.loot.LootContextBridge;
 import io.izzel.arclight.common.mod.ArclightConstants;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -18,9 +17,9 @@ import org.spongepowered.asm.mixin.Shadow;
 public abstract class LootingEnchantBonusMixin {
 
     // @formatter:off
-    @Shadow @Final private NumberProvider value;
-    @Shadow @Final private int limit;
-    @Shadow protected abstract boolean hasLimit();
+    @Shadow @Final NumberProvider value;
+    @Shadow @Final int limit;
+    @Shadow abstract boolean hasLimit();
     // @formatter:on
 
     /**
@@ -31,7 +30,7 @@ public abstract class LootingEnchantBonusMixin {
     public ItemStack run(ItemStack stack, LootContext context) {
         Entity entity = context.getParamOrNull(LootContextParams.KILLER_ENTITY);
         if (entity instanceof LivingEntity) {
-            int i = ((LootContextBridge) context).bridge$forge$getLootingModifier(entity);
+            int i = context.getLootingModifier();
             if (context.hasParam(ArclightConstants.LOOTING_MOD)) {
                 i = context.getParamOrNull(ArclightConstants.LOOTING_MOD);
             }

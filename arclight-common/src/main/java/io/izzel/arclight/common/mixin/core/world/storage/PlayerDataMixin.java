@@ -3,7 +3,6 @@ package io.izzel.arclight.common.mixin.core.world.storage;
 import io.izzel.arclight.common.bridge.core.entity.player.ServerPlayerEntityBridge;
 import io.izzel.arclight.common.bridge.core.world.storage.PlayerDataBridge;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -28,7 +27,7 @@ public class PlayerDataMixin implements PlayerDataBridge {
     @Shadow @Final private static Logger LOGGER;
     // @formatter:on
 
-    @Inject(method = "load", at = @At(value = "INVOKE", target = "Lnet/minecraft/nbt/NbtUtils;getDataVersion(Lnet/minecraft/nbt/CompoundTag;I)I"))
+    @Inject(method = "load", at = @At(value = "INVOKE", target = "Lnet/minecraft/nbt/CompoundTag;contains(Ljava/lang/String;I)Z"))
     private void arclight$lastSeenTime(Player player, CallbackInfoReturnable<CompoundTag> cir) {
         if (player instanceof ServerPlayer) {
             CraftPlayer craftPlayer = ((ServerPlayerEntityBridge) player).bridge$getBukkitEntity();
@@ -48,7 +47,7 @@ public class PlayerDataMixin implements PlayerDataBridge {
         try {
             final File file1 = new File(this.playerDir, uuid + ".dat");
             if (file1.exists()) {
-                return NbtIo.readCompressed(new FileInputStream(file1), NbtAccounter.unlimitedHeap());
+                return NbtIo.readCompressed(new FileInputStream(file1));
             }
         } catch (Exception exception) {
             LOGGER.warn("Failed to load player data for " + uuid);

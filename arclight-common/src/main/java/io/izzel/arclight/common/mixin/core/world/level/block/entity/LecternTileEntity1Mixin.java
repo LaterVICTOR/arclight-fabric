@@ -5,7 +5,7 @@ import io.izzel.arclight.common.bridge.core.tileentity.TileEntityBridge;
 import io.izzel.arclight.common.bridge.core.world.WorldBridge;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.level.block.LecternBlock;
 import net.minecraft.world.level.block.entity.LecternBlockEntity;
 import org.bukkit.Location;
@@ -21,8 +21,9 @@ import java.util.List;
 
 @Mixin(targets = "net/minecraft/world/level/block/entity/LecternBlockEntity$1")
 public abstract class LecternTileEntity1Mixin implements IInventoryBridge, Container {
-    @Shadow(aliases = {"this$0", "f_59572_", "field_17391"}, remap = false)
-    private LecternBlockEntity outerThis;
+
+    @Shadow(aliases = {"this$0", "f_59572_"}, remap = false) private LecternBlockEntity outerThis;
+
     public List<HumanEntity> transaction = new ArrayList<>();
     private int maxStack = 1;
 
@@ -31,7 +32,7 @@ public abstract class LecternTileEntity1Mixin implements IInventoryBridge, Conta
         if (index == 0) {
             outerThis.setBook(stack);
             if (outerThis.getLevel() != null) {
-                LecternBlock.resetBookState(null, outerThis.getLevel(), outerThis.getBlockPos(), outerThis.getBlockState(), outerThis.hasBook());
+                LecternBlock.resetBookState(outerThis.getLevel(), outerThis.getBlockPos(), outerThis.getBlockState(), outerThis.hasBook());
             }
         }
     }
@@ -78,17 +79,16 @@ public abstract class LecternTileEntity1Mixin implements IInventoryBridge, Conta
 
     @Override
     public Location getLocation() {
-        if (outerThis.getLevel() == null) return null;
         return new Location(((WorldBridge) outerThis.getLevel()).bridge$getWorld(), outerThis.getBlockPos().getX(), outerThis.getBlockPos().getY(), outerThis.getBlockPos().getZ());
     }
 
     @Override
-    public RecipeHolder<?> getCurrentRecipe() {
+    public Recipe<?> getCurrentRecipe() {
         return null;
     }
 
     @Override
-    public void setCurrentRecipe(RecipeHolder<?> recipe) {
+    public void setCurrentRecipe(Recipe<?> recipe) {
     }
 
     public LecternBlockEntity getLectern() {

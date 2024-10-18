@@ -1,12 +1,12 @@
 package io.izzel.arclight.common.mixin.bukkit;
 
 import com.google.common.base.Function;
-import io.izzel.arclight.common.bridge.core.util.DamageSourceBridge;
+import io.izzel.arclight.common.bridge.core.entity.EntityBridge;
+import io.izzel.arclight.common.bridge.core.world.WorldBridge;
 import io.izzel.arclight.common.mod.util.ArclightCaptures;
 import io.izzel.arclight.common.mod.util.DistValidate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.level.Level;
@@ -18,7 +18,6 @@ import org.bukkit.craftbukkit.v.block.CraftBlock;
 import org.bukkit.craftbukkit.v.block.CraftBlockState;
 import org.bukkit.craftbukkit.v.block.CraftBlockStates;
 import org.bukkit.craftbukkit.v.block.data.CraftBlockData;
-import org.bukkit.craftbukkit.v.damage.CraftDamageSource;
 import org.bukkit.craftbukkit.v.event.CraftEventFactory;
 import org.bukkit.craftbukkit.v.util.CraftMagicNumbers;
 import org.bukkit.entity.Item;
@@ -31,6 +30,7 @@ import org.bukkit.event.block.BlockSpreadEvent;
 import org.bukkit.event.block.EntityBlockFormEvent;
 import org.bukkit.event.block.NotePlayEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
 import org.spongepowered.asm.mixin.Mixin;
@@ -38,43 +38,51 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import javax.annotation.Nullable;
 import java.util.Map;
 
 @Mixin(value = CraftEventFactory.class, remap = false)
-public abstract class CraftEventFactoryMixin {
+public class CraftEventFactoryMixin {
 
-    // @formatter:off
-    @Shadow private static EntityDamageEvent callEntityDamageEvent(Entity damager, Entity damagee, EntityDamageEvent.DamageCause cause, org.bukkit.damage.DamageSource bukkitDamageSource, Map<EntityDamageEvent.DamageModifier, Double> modifiers, Map<EntityDamageEvent.DamageModifier, Function<? super Double, Double>> modifierFunctions, boolean cancelled) { return null; }
-    // @formatter:on
+    @Shadow public static Entity entityDamage;
+    @Shadow public static Block blockDamage;
 
-    @ModifyVariable(method = "handleEntityDamageEvent*", at = @At("HEAD"), index = 1, argsOnly = true)
-    private static DamageSource arclight$captureSource(DamageSource source, Entity entity) {
+    @Inject(method = "handleEntityDamageEvent(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/damagesource/DamageSource;Ljava/util/Map;Ljava/util/Map;Z)Lorg/bukkit/event/entity/EntityDamageEvent;", at = @At("HEAD"))
+    private static void arclight$captureSource(Entity entity, DamageSource source, Map<EntityDamageEvent.DamageModifier, Double> modifiers, Map<EntityDamageEvent.DamageModifier, Function<? super Double, Double>> modifierFunctions, boolean cancelled, CallbackInfoReturnable<EntityDamageEvent> cir) {
         Entity damageEventEntity = ArclightCaptures.getDamageEventEntity();
         BlockPos damageEventBlock = ArclightCaptures.getDamageEventBlock();
-        if (damageEventEntity != null && ((DamageSourceBridge) source).bridge$getCausingEntity() == null) {
-            if (source.is(DamageTypes.LIGHTNING_BOLT)) {
-                source = ((DamageSourceBridge) source).bridge$customCausingEntity(damageEventEntity);
+        if (damageEventEntity != null && entityDamage == null) {
+            if (source.msgId.equals(DamageSource.LIGHTNING_BOLT.msgId)) {
+                entityDamage = damageEventEntity;
             }
         }
-        if (damageEventBlock != null && ((DamageSourceBridge) source).bridge$directBlock() == null) {
-            if (source.is(DamageTypes.CACTUS)
-                    || source.is(DamageTypes.SWEET_BERRY_BUSH)
-                    || source.is(DamageTypes.HOT_FLOOR)) {
-                source = ((DamageSourceBridge) source).bridge$directBlock(CraftBlock.at(entity.getCommandSenderWorld(), damageEventBlock));
+        if (damageEventBlock != null && blockDamage == null) {
+            if (source.msgId.equals(DamageSource.CACTUS.msgId)
+                || source.msgId.equals(DamageSource.SWEET_BERRY_BUSH.msgId)
+                || source.msgId.equals(DamageSource.HOT_FLOOR.msgId)) {
+                blockDamage = CraftBlock.at(entity.getCommandSenderWorld(), damageEventBlock);
             }
         }
-        return source;
     }
 
-    @Inject(method = "handleEntityDamageEvent*", cancellable = true, at = @At(value = "NEW", target = "java/lang/IllegalStateException"))
+    @Inject(method = "handleEntityDamageEvent(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/damagesource/DamageSource;Ljava/util/Map;Ljava/util/Map;Z)Lorg/bukkit/event/entity/EntityDamageEvent;", cancellable = true, at = @At(value = "NEW", target = "java/lang/IllegalStateException"))
     private static void arclight$unhandledDamage(Entity entity, DamageSource source, Map<EntityDamageEvent.DamageModifier, Double> modifiers, Map<EntityDamageEvent.DamageModifier, Function<? super Double, Double>> modifierFunctions, boolean cancelled, CallbackInfoReturnable<EntityDamageEvent> cir) {
         // todo blockDamage is lost
-        CraftDamageSource bukkitDamageSource = new CraftDamageSource(source);
-        EntityDamageEvent event = callEntityDamageEvent(((DamageSourceBridge) source).bridge$getCausingEntity(), entity, EntityDamageEvent.DamageCause.CUSTOM, bukkitDamageSource, modifiers, modifierFunctions, cancelled);
+        EntityDamageEvent event;
+        if (source.getEntity() != null) {
+            // ArclightMod.LOGGER.debug("Unhandled damage of {} by {} from {}", entity, source.getEntity(), source.msgId);
+            event = new EntityDamageByEntityEvent(((EntityBridge) source.getEntity()).bridge$getBukkitEntity(), ((EntityBridge) entity).bridge$getBukkitEntity(), EntityDamageEvent.DamageCause.CUSTOM, modifiers, modifierFunctions);
+        } else {
+            // ArclightMod.LOGGER.debug("Unhandled damage of {} from {}", entity, source.msgId);
+            event = new EntityDamageEvent(((EntityBridge) entity).bridge$getBukkitEntity(), EntityDamageEvent.DamageCause.CUSTOM, modifiers, modifierFunctions);
+        }
+        event.setCancelled(cancelled);
+        Bukkit.getPluginManager().callEvent(event);
+        if (!event.isCancelled()) {
+            ((EntityBridge) entity).bridge$getBukkitEntity().setLastDamageCause(event);
+        }
         cir.setReturnValue(event);
     }
 
@@ -113,7 +121,7 @@ public abstract class CraftEventFactoryMixin {
             world.setBlock(pos, newData, flag);
             return true;
         }
-        Block block = world.bridge$getWorld().getBlockAt(pos.getX(), pos.getY(), pos.getZ());
+        Block block = ((WorldBridge) world).bridge$getWorld().getBlockAt(pos.getX(), pos.getY(), pos.getZ());
         CraftBlockState state = (CraftBlockState) block.getState();
         state.setData(newData);
 
@@ -141,7 +149,7 @@ public abstract class CraftEventFactoryMixin {
         CraftBlockState blockState = CraftBlockStates.getBlockState(world, pos, flag);
         blockState.setData(block);
 
-        BlockFormEvent event = (entity == null) ? new BlockFormEvent(blockState.getBlock(), blockState) : new EntityBlockFormEvent(entity.bridge$getBukkitEntity(), blockState.getBlock(), blockState);
+        BlockFormEvent event = (entity == null) ? new BlockFormEvent(blockState.getBlock(), blockState) : new EntityBlockFormEvent(((EntityBridge) entity).bridge$getBukkitEntity(), blockState.getBlock(), blockState);
         Bukkit.getPluginManager().callEvent(event);
 
         if (!event.isCancelled()) {
@@ -189,15 +197,15 @@ public abstract class CraftEventFactoryMixin {
      * @reason
      */
     @Overwrite
-    public static boolean callEntityChangeBlockEvent(Entity entity, BlockPos position, net.minecraft.world.level.block.state.BlockState newBlock, boolean cancelled) {
-        Block block = CraftBlock.at(entity.level(), position);
-        EntityChangeBlockEvent event = new EntityChangeBlockEvent(entity.bridge$getBukkitEntity(), block, CraftBlockData.fromData(newBlock));
+    public static EntityChangeBlockEvent callEntityChangeBlockEvent(Entity entity, BlockPos position, net.minecraft.world.level.block.state.BlockState newBlock, boolean cancelled) {
+        Block block = CraftBlock.at(entity.level, position);
+        EntityChangeBlockEvent event = new EntityChangeBlockEvent(((EntityBridge) entity).bridge$getBukkitEntity(), block, CraftBlockData.fromData(newBlock));
         event.setCancelled(cancelled);
         // Suppress during worldgen
-        if (DistValidate.isValid(entity.level())) {
+        if (DistValidate.isValid(entity.level)) {
             Bukkit.getPluginManager().callEvent(event);
         }
-        return !event.isCancelled();
+        return event;
     }
 
     /**
@@ -231,7 +239,7 @@ public abstract class CraftEventFactoryMixin {
     @Inject(method = "callItemSpawnEvent", cancellable = true, at = @At("HEAD"))
     private static void arclight$noAirDrops(ItemEntity itemEntity, CallbackInfoReturnable<ItemSpawnEvent> cir) {
         if (itemEntity.getItem().isEmpty()) {
-            Item entity = (Item) itemEntity.bridge$getBukkitEntity();
+            Item entity = (Item) ((EntityBridge) itemEntity).bridge$getBukkitEntity();
             ItemSpawnEvent event = new ItemSpawnEvent(entity);
             event.setCancelled(true);
             cir.setReturnValue(event);

@@ -11,6 +11,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.monster.Shulker;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.AABB;
+import net.minecraftforge.event.ForgeEventFactory;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.event.entity.CreatureSpawnEvent;
@@ -30,7 +31,7 @@ public abstract class ShulkerMixin extends PathfinderMobMixin {
 
     // @formatter:off
     @Shadow @Nullable protected abstract Direction findAttachableSurface(BlockPos p_149811_);
-    @Shadow public abstract void setAttachFace(Direction p_149789_);
+    @Shadow protected abstract void setAttachFace(Direction p_149789_);
     @Shadow @Final protected static EntityDataAccessor<Byte> DATA_PEEK_ID;
     // @formatter:on
 
@@ -45,22 +46,19 @@ public abstract class ShulkerMixin extends PathfinderMobMixin {
 
             for (int i = 0; i < 5; ++i) {
                 BlockPos blockpos1 = blockpos.offset(Mth.randomBetweenInclusive(this.random, -8, 8), Mth.randomBetweenInclusive(this.random, -8, 8), Mth.randomBetweenInclusive(this.random, -8, 8));
-                if (blockpos1.getY() > this.level().getMinBuildHeight() && this.level().isEmptyBlock(blockpos1) && this.level().getWorldBorder().isWithinBounds(blockpos1) && this.level().noCollision((Shulker) (Object) this, (new AABB(blockpos1)).deflate(1.0E-6D))) {
+                if (blockpos1.getY() > this.level.getMinBuildHeight() && this.level.isEmptyBlock(blockpos1) && this.level.getWorldBorder().isWithinBounds(blockpos1) && this.level.noCollision((Shulker) (Object) this, (new AABB(blockpos1)).deflate(1.0E-6D))) {
                     Direction direction = this.findAttachableSurface(blockpos1);
                     if (direction != null) {
-                        var pos = bridge$forge$onEnderTeleport((Shulker) (Object) this, blockpos1.getX(), blockpos1.getY(), blockpos1.getZ());
-                        if (pos == null) {
-                            direction = null;
-                        } else {
-                            blockpos1 = pos;
-                        }
+                        var event = ForgeEventFactory.onEnderTeleport((Shulker) (Object) this, blockpos1.getX(), blockpos1.getY(), blockpos1.getZ());
+                        if (event.isCanceled()) direction = null;
+                        blockpos1 = new BlockPos(event.getTargetX(), event.getTargetY(), event.getTargetZ());
                     }
                     if (direction != null) {
-                        EntityTeleportEvent teleport = new EntityTeleportEvent(this.getBukkitEntity(), this.getBukkitEntity().getLocation(), new Location(((WorldBridge) this.level()).bridge$getWorld(), blockpos1.getX(), blockpos1.getY(), blockpos1.getZ()));
+                        EntityTeleportEvent teleport = new EntityTeleportEvent(this.getBukkitEntity(), this.getBukkitEntity().getLocation(), new Location(((WorldBridge) this.level).bridge$getWorld(), blockpos1.getX(), blockpos1.getY(), blockpos1.getZ()));
                         Bukkit.getPluginManager().callEvent(teleport);
                         if (!teleport.isCancelled()) {
                             Location to = teleport.getTo();
-                            blockpos1 = BlockPos.containing(to.getX(), to.getY(), to.getZ());
+                            blockpos1 = new BlockPos(to.getX(), to.getY(), to.getZ());
                         } else {
                             return false;
                         }
@@ -68,7 +66,7 @@ public abstract class ShulkerMixin extends PathfinderMobMixin {
                         this.setAttachFace(direction);
                         this.playSound(SoundEvents.SHULKER_TELEPORT, 1.0F, 1.0F);
                         this.setPos((double) blockpos1.getX() + 0.5D, blockpos1.getY(), (double) blockpos1.getZ() + 0.5D);
-                        this.level().gameEvent(GameEvent.TELEPORT, blockpos, GameEvent.Context.of((Entity) (Object) this));
+                        this.level.gameEvent(GameEvent.TELEPORT, blockpos, GameEvent.Context.of((Entity) (Object) this));
                         this.entityData.set(DATA_PEEK_ID, (byte) 0);
                         this.setTarget(null);
                         return true;
@@ -84,6 +82,6 @@ public abstract class ShulkerMixin extends PathfinderMobMixin {
 
     @Inject(method = "hitByShulkerBullet", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;addFreshEntity(Lnet/minecraft/world/entity/Entity;)Z"))
     private void arclight$breedCause(CallbackInfo ci) {
-        ((WorldBridge) this.level()).bridge$pushAddEntityReason(CreatureSpawnEvent.SpawnReason.BREEDING);
+        ((WorldBridge) this.level).bridge$pushAddEntityReason(CreatureSpawnEvent.SpawnReason.BREEDING);
     }
 }

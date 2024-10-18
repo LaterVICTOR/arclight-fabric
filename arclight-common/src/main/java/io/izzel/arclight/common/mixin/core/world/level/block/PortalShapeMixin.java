@@ -1,15 +1,15 @@
 package io.izzel.arclight.common.mixin.core.world.level.block;
 
+import io.izzel.arclight.common.bridge.core.block.PortalInfoBridge;
+import io.izzel.arclight.common.bridge.core.block.PortalSizeBridge;
 import io.izzel.arclight.common.bridge.core.world.IWorldBridge;
-import io.izzel.arclight.common.bridge.core.world.level.block.PortalInfoBridge;
-import io.izzel.arclight.common.bridge.core.world.level.block.PortalSizeBridge;
-import io.izzel.arclight.common.mod.mixins.annotation.RenameInto;
+import io.izzel.arclight.common.bridge.core.world.WorldBridge;
 import io.izzel.arclight.common.mod.util.ArclightCaptures;
 import net.minecraft.BlockUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Blocks;
@@ -43,13 +43,13 @@ public abstract class PortalShapeMixin implements PortalSizeBridge {
 
     // @formatter:off
     @Shadow @Final private LevelAccessor level;
-    @Shadow public abstract void createPortalBlocks();
+    @Shadow public abstract void shadow$createPortalBlocks();
     @Shadow @Final private Direction.Axis axis;
     @Shadow @Nullable private BlockPos bottomLeft;
     @Shadow private int height;
     @Shadow @Final private Direction rightDir;
     @Shadow @Final private int width;
-    @Shadow public static PortalInfo createPortalInfo(ServerLevel p_259301_, BlockUtil.FoundRectangle p_259931_, Direction.Axis p_259901_, Vec3 p_259630_, Entity p_259166_, Vec3 p_260043_, float p_259853_, float p_259667_) { return null; }
+    @Shadow public static PortalInfo createPortalInfo(ServerLevel world, BlockUtil.FoundRectangle result, Direction.Axis axis, Vec3 offsetVector, EntityDimensions size, Vec3 motion, float rotationYaw, float rotationPitch) { return null; }
     // @formatter:on
 
     List<BlockState> blocks = new ArrayList<>();
@@ -65,7 +65,7 @@ public abstract class PortalShapeMixin implements PortalSizeBridge {
 
     @Inject(method = "createPortalBlocks", cancellable = true, at = @At("HEAD"))
     private void arclight$buildPortal(CallbackInfo ci) {
-        World world = ((IWorldBridge) this.level).bridge$getMinecraftWorld().bridge$getWorld();
+        World world = ((WorldBridge) ((IWorldBridge) this.level).bridge$getMinecraftWorld()).bridge$getWorld();
         net.minecraft.world.level.block.state.BlockState blockState = Blocks.NETHER_PORTAL.defaultBlockState().setValue(NetherPortalBlock.AXIS, this.axis);
         BlockPos.betweenClosed(this.bottomLeft, this.bottomLeft.relative(Direction.UP, this.height - 1).relative(this.rightDir, this.width - 1)).forEach(pos -> {
             CraftBlockState state = CraftBlockStates.getBlockState(((IWorldBridge) this.level).bridge$getMinecraftWorld(), pos, 18);
@@ -82,19 +82,18 @@ public abstract class PortalShapeMixin implements PortalSizeBridge {
 
     private transient boolean arclight$ret;
 
-    @RenameInto("createPortalBlocks")
-    public boolean bukkit$createPortalBlocks() {
-        this.createPortalBlocks();
+    public boolean createPortalBlocks() {
+        this.shadow$createPortalBlocks();
         return arclight$ret;
     }
 
     @Override
     public boolean bridge$createPortal() {
-        return bukkit$createPortalBlocks();
+        return createPortalBlocks();
     }
 
     @SuppressWarnings("ConstantConditions")
-    @Redirect(method = "createPortalInfo", at = @At(value = "NEW", target = "(Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/phys/Vec3;FF)Lnet/minecraft/world/level/portal/PortalInfo;"))
+    @Redirect(method = "createPortalInfo", at = @At(value = "NEW", target = "net/minecraft/world/level/portal/PortalInfo"))
     private static PortalInfo arclight$setPortalInfo(Vec3 pos, Vec3 motion, float rotationYaw, float rotationPitch, ServerLevel world) {
         PortalInfo portalInfo = new PortalInfo(pos, motion, rotationYaw, rotationPitch);
         ((PortalInfoBridge) portalInfo).bridge$setWorld(world);
@@ -102,8 +101,8 @@ public abstract class PortalShapeMixin implements PortalSizeBridge {
         return portalInfo;
     }
 
-    private static PortalInfo createPortalInfo(ServerLevel world, BlockUtil.FoundRectangle result, Direction.Axis axis, Vec3 offsetVector, Entity entity, Vec3 motion, float rotationYaw, float rotationPitch, CraftPortalEvent event) {
+    private static PortalInfo createPortalInfo(ServerLevel world, BlockUtil.FoundRectangle result, Direction.Axis axis, Vec3 offsetVector, EntityDimensions size, Vec3 motion, float rotationYaw, float rotationPitch, CraftPortalEvent event) {
         ArclightCaptures.captureCraftPortalEvent(event);
-        return createPortalInfo(world, result, axis, offsetVector, entity, motion, rotationYaw, rotationPitch);
+        return createPortalInfo(world, result, axis, offsetVector, size, motion, rotationYaw, rotationPitch);
     }
 }

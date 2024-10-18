@@ -1,11 +1,12 @@
 package io.izzel.arclight.common.mixin.core.world.entity.vehicle;
 
 import io.izzel.arclight.common.bridge.core.entity.EntityBridge;
-import io.izzel.arclight.common.bridge.core.entity.vehicle.AbstractMinecartBridge;
-import io.izzel.arclight.common.bridge.core.world.level.block.BlockBridge;
+import io.izzel.arclight.common.bridge.core.world.WorldBridge;
+import io.izzel.arclight.common.mixin.core.world.entity.EntityMixin;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySelector;
 import net.minecraft.world.entity.EntityType;
@@ -17,10 +18,13 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseRailBlock;
 import net.minecraft.world.level.block.PoweredRailBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.Vec3;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Vehicle;
+import org.bukkit.event.vehicle.VehicleDamageEvent;
+import org.bukkit.event.vehicle.VehicleDestroyEvent;
 import org.bukkit.event.vehicle.VehicleEntityCollisionEvent;
 import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.event.vehicle.VehicleUpdateEvent;
@@ -36,20 +40,27 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 
 @Mixin(AbstractMinecart.class)
-public abstract class AbstractMinecartMixin extends VehicleEntityMixin implements AbstractMinecartBridge {
+public abstract class AbstractMinecartMixin extends EntityMixin {
 
     // @formatter:off
-    @Shadow private int lerpSteps;
-    @Shadow private double lerpX;
-    @Shadow private double lerpY;
-    @Shadow private double lerpZ;
-    @Shadow private double lerpYRot;
-    @Shadow private double lerpXRot;
+    @Shadow public abstract void setHurtDir(int rollingDirection);
+    @Shadow public abstract int getHurtDir();
+    @Shadow public abstract void setHurtTime(int rollingAmplitude);
+    @Shadow public abstract void setDamage(float damage);
+    @Shadow public abstract float getDamage();
+    @Shadow public abstract void destroy(DamageSource source);
+    @Shadow public abstract int getHurtTime();
+    @Shadow private int lSteps;
+    @Shadow private double lx;
+    @Shadow private double ly;
+    @Shadow private double lz;
+    @Shadow private double lyr;
+    @Shadow private double lxr;
     @Shadow protected abstract void moveAlongTrack(BlockPos pos, BlockState state);
     @Shadow public abstract void activateMinecart(int x, int y, int z, boolean receivingPower);
     @Shadow private boolean flipped;
     @Shadow public abstract AbstractMinecart.Type getMinecartType();
-    @Shadow private boolean onRails;
+    @Shadow(remap = false) public abstract boolean canUseRail();
     // @formatter:on
 
     public boolean slowWhenEmpty = true;
@@ -73,7 +84,48 @@ public abstract class AbstractMinecartMixin extends VehicleEntityMixin implement
         maxSpeed = 0.4D;
     }
 
-    private transient Location arclight$prevLocation;
+    /**
+     * @author IzzelAliz
+     * @reason
+     */
+    @Overwrite
+    public boolean hurt(DamageSource source, float amount) {
+        if (this.level.isClientSide || this.isRemoved()) {
+            return true;
+        }
+        if (this.isInvulnerableTo(source)) {
+            return false;
+        }
+        Vehicle vehicle = (Vehicle) this.getBukkitEntity();
+        org.bukkit.entity.Entity passenger = (source.getEntity() == null) ? null : ((EntityBridge) source.getEntity()).bridge$getBukkitEntity();
+        VehicleDamageEvent event = new VehicleDamageEvent(vehicle, passenger, amount);
+        Bukkit.getPluginManager().callEvent(event);
+        if (event.isCancelled()) {
+            return false;
+        }
+        amount = (float) event.getDamage();
+        this.setHurtDir(-this.getHurtDir());
+        this.setHurtTime(10);
+        this.markHurt();
+        this.setDamage(this.getDamage() + amount * 10.0f);
+        this.gameEvent(GameEvent.ENTITY_DAMAGE, source.getEntity());
+        boolean flag = source.getEntity() instanceof Player && ((Player) source.getEntity()).getAbilities().instabuild;
+        if (flag || this.getDamage() > 40.0f) {
+            VehicleDestroyEvent destroyEvent = new VehicleDestroyEvent(vehicle, passenger);
+            Bukkit.getPluginManager().callEvent(destroyEvent);
+            if (destroyEvent.isCancelled()) {
+                this.setDamage(40.0f);
+                return true;
+            }
+            this.ejectPassengers();
+            if (flag && !this.hasCustomName()) {
+                this.discard();
+            } else {
+                this.destroy(source);
+            }
+        }
+        return true;
+    }
 
     /**
      * @author IzzelAliz
@@ -81,20 +133,33 @@ public abstract class AbstractMinecartMixin extends VehicleEntityMixin implement
      */
     @Overwrite
     public void tick() {
-        this.arclight$prevLocation = new Location(null, this.getX(), this.getY(), this.getZ(), this.getYRot(), this.getXRot());
+        double prevX = this.getX();
+        double prevY = this.getY();
+        double prevZ = this.getZ();
+        float prevYaw = this.getYRot();
+        float prevPitch = this.getXRot();
         if (this.getHurtTime() > 0) {
             this.setHurtTime(this.getHurtTime() - 1);
         }
         if (this.getDamage() > 0.0f) {
             this.setDamage(this.getDamage() - 1.0f);
         }
-        this.checkBelowWorld();
-        if (this.level().isClientSide) {
-            if (this.lerpSteps > 0) {
-                this.lerpPositionAndRotationStep(this.lerpSteps, this.lerpX, this.lerpY, this.lerpZ, this.lerpYRot, this.lerpXRot);
-                --this.lerpSteps;
+        if (this.getY() < -64.0) {
+            this.outOfWorld();
+        }
+        if (this.level.isClientSide) {
+            if (this.lSteps > 0) {
+                double d0 = this.getX() + (this.lx - this.getX()) / this.lSteps;
+                double d2 = this.getY() + (this.ly - this.getY()) / this.lSteps;
+                double d3 = this.getZ() + (this.lz - this.getZ()) / this.lSteps;
+                double d4 = Mth.wrapDegrees(this.lyr - this.getYRot());
+                this.setYRot(this.getYRot() + (float) (d4 / this.lSteps));
+                this.setXRot(this.getXRot() + (float) ((this.lxr - this.getXRot()) / this.lSteps));
+                --this.lSteps;
+                this.setPos(d0, d2, d3);
+                this.setRot(this.getYRot(), this.getXRot());
             } else {
-                this.reapplyPosition();
+                this.setPos(this.getX(), this.getY(), this.getZ());
                 this.setRot(this.getYRot(), this.getXRot());
             }
         } else {
@@ -109,15 +174,14 @@ public abstract class AbstractMinecartMixin extends VehicleEntityMixin implement
             int i = Mth.floor(this.getX());
             int j = Mth.floor(this.getY());
             int k = Mth.floor(this.getZ());
-            if (this.level().getBlockState(new BlockPos(i, j - 1, k)).is(BlockTags.RAILS)) {
+            if (this.level.getBlockState(new BlockPos(i, j - 1, k)).is(BlockTags.RAILS)) {
                 --j;
             }
             BlockPos blockposition = new BlockPos(i, j, k);
-            BlockState blockstate = this.level().getBlockState(blockposition);
-            this.onRails = BaseRailBlock.isRail(blockstate);
-            if (this.bridge$forge$canUseRail() && this.onRails) {
+            BlockState blockstate = this.level.getBlockState(blockposition);
+            if (this.canUseRail() && BaseRailBlock.isRail(blockstate)) {
                 this.moveAlongTrack(blockposition, blockstate);
-                if (((BlockBridge) blockstate.getBlock()).bridge$forge$isActivatorRail(blockstate)) {
+                if (blockstate.getBlock() instanceof PoweredRailBlock && ((PoweredRailBlock) blockstate.getBlock()).isActivatorRail()) {
                     this.activateMinecart(i, j, k, blockstate.getValue(PoweredRailBlock.POWERED));
                 }
             } else {
@@ -139,10 +203,8 @@ public abstract class AbstractMinecartMixin extends VehicleEntityMixin implement
                 this.flipped = !this.flipped;
             }
             this.setRot(this.getYRot(), this.getXRot());
-            org.bukkit.World bworld = this.level().bridge$getWorld();
-            Location from = this.arclight$prevLocation;
-            this.arclight$prevLocation = null;
-            from.setWorld(bworld);
+            org.bukkit.World bworld = ((WorldBridge) this.level).bridge$getWorld();
+            Location from = new Location(bworld, prevX, prevY, prevZ, prevYaw, prevPitch);
             Location to = new Location(bworld, this.getX(), this.getY(), this.getZ(), this.getYRot(), this.getXRot());
             Vehicle vehicle = (Vehicle) this.getBukkitEntity();
             Bukkit.getPluginManager().callEvent(new VehicleUpdateEvent(vehicle));
@@ -150,7 +212,7 @@ public abstract class AbstractMinecartMixin extends VehicleEntityMixin implement
                 Bukkit.getPluginManager().callEvent(new VehicleMoveEvent(vehicle, from, to));
             }
             if (this.getMinecartType() == AbstractMinecart.Type.RIDEABLE && this.getDeltaMovement().horizontalDistanceSqr() > 0.01) {
-                List<Entity> list = this.level().getEntities((AbstractMinecart) (Object) this, this.getBoundingBox().inflate(0.20000000298023224, 0.0, 0.20000000298023224), EntitySelector.pushableBy((AbstractMinecart) (Object) this));
+                List<Entity> list = this.level.getEntities((AbstractMinecart) (Object) this, this.getBoundingBox().inflate(0.20000000298023224, 0.0, 0.20000000298023224), EntitySelector.pushableBy((AbstractMinecart) (Object) this));
                 if (!list.isEmpty()) {
                     for (Entity entity : list) {
                         if (!(entity instanceof Player) && !(entity instanceof IronGolem) && !(entity instanceof AbstractMinecart) && !this.isVehicle() && !entity.isPassenger()) {
@@ -172,7 +234,7 @@ public abstract class AbstractMinecartMixin extends VehicleEntityMixin implement
                     }
                 }
             } else {
-                for (Entity entity2 : this.level().getEntities((AbstractMinecart) (Object) this, this.getBoundingBox().inflate(0.20000000298023224, 0.0, 0.20000000298023224))) {
+                for (Entity entity2 : this.level.getEntities((AbstractMinecart) (Object) this, this.getBoundingBox().inflate(0.20000000298023224, 0.0, 0.20000000298023224))) {
                     if (!this.hasPassenger(entity2) && entity2.isPushable() && entity2 instanceof AbstractMinecart) {
                         VehicleEntityCollisionEvent collisionEvent2 = new VehicleEntityCollisionEvent(vehicle, ((EntityBridge) entity2).bridge$getBukkitEntity());
                         Bukkit.getPluginManager().callEvent(collisionEvent2);

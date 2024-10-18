@@ -8,9 +8,7 @@ import net.minecraft.world.entity.projectile.LargeFireball;
 import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.HitResult;
 import org.bukkit.Bukkit;
-import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.ExplosionPrimeEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -31,20 +29,15 @@ public abstract class LargeFireballMixin extends AbstractHurtingProjectileMixin 
         this.isIncendiary = level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
     }
 
-    @Inject(method = "onHit", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/projectile/LargeFireball;discard()V"))
-    private void arclight$explode(HitResult hitResult, CallbackInfo ci) {
-        this.bridge$pushEntityRemoveCause(EntityRemoveEvent.Cause.HIT);
-    }
-
-    @Redirect(method = "onHit", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;explode(Lnet/minecraft/world/entity/Entity;DDDFZLnet/minecraft/world/level/Level$ExplosionInteraction;)Lnet/minecraft/world/level/Explosion;"))
-    private Explosion arclight$explodePrime(Level world, Entity entityIn, double xIn, double yIn, double zIn, float explosionRadius, boolean causesFire, Level.ExplosionInteraction interaction) {
+    @Redirect(method = "onHit", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;explode(Lnet/minecraft/world/entity/Entity;DDDFZLnet/minecraft/world/level/Explosion$BlockInteraction;)Lnet/minecraft/world/level/Explosion;"))
+    private Explosion arclight$explodePrime(Level world, Entity entityIn, double xIn, double yIn, double zIn, float explosionRadius, boolean causesFire, Explosion.BlockInteraction modeIn) {
         ExplosionPrimeEvent event = new ExplosionPrimeEvent((org.bukkit.entity.Explosive) this.getBukkitEntity());
         event.setRadius(explosionRadius);
         event.setFire(causesFire);
         Bukkit.getPluginManager().callEvent(event);
 
         if (!event.isCancelled()) {
-            return this.level().explode((LargeFireball) (Object) this, xIn, yIn, zIn, event.getRadius(), event.getFire(), interaction);
+            return this.level.explode((LargeFireball) (Object) this, xIn, yIn, zIn, event.getRadius(), event.getFire(), modeIn);
         } else {
             return null;
         }
