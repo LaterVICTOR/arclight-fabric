@@ -250,23 +250,6 @@ tasks.register('runProdServer', JavaExec) {
     dependsOn project.tasks.forgeJar
 }
 
-tasks.register('runProdNeoforge', JavaExec) {
-    classpath = files(tasks.neoforgeJar)
-    // systemProperties 'bsl.debug': 'true'
-    systemProperties 'terminal.ansi': 'true'
-    systemProperties 'mixin.debug.export': 'true'
-    systemProperties 'mixin.dumpTargetOnFailure': 'true'
-    systemProperties 'arclight.alwaysExtract': 'true'
-    systemProperties 'arclight.remapper.dump': './.mixin.out/plugin_classes'
-    workingDir System.env.ARCLIGHT_PROD_DIR ?: file('run_prod/neoforge')
-    maxHeapSize '4G'
-    args 'nogui'
-    standardInput System.in
-    javaLauncher.convention(javaToolchains.launcherFor {
-        languageVersion = JavaLanguageVersion.of(17)
-    })
-    dependsOn project.tasks.neoforgeJar
-}
 
 tasks.register('runProdFabric', JavaExec) {
     classpath = files(tasks.fabricJar)

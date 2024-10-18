@@ -55,7 +55,6 @@ jar.enabled = false
 tasks.register('collect', Copy) {
     destinationDir = file('build/libs')
     from project(':bootstrap').tasks.forgeJar.outputs
-    from project(':bootstrap').tasks.neoforgeJar.outputs
     from project(':bootstrap').tasks.fabricJar.outputs
 }
 
