@@ -1,13 +1,21 @@
 package io.izzel.arclight.common.mod.util.remapper;
 
+import cpw.mods.modlauncher.TransformingClassLoader;
+
 public interface RemappingClassLoader {
 
     ClassLoaderRemapper getRemapper();
 
     static ClassLoader asTransforming(ClassLoader classLoader) {
-        if (classLoader == ClassLoader.getPlatformClassLoader() || classLoader == ClassLoader.getSystemClassLoader() || classLoader == null) {
-            return RemappingClassLoader.class.getClassLoader();
+        boolean found = false;
+        while (classLoader != null) {
+            if (classLoader instanceof TransformingClassLoader || classLoader instanceof RemappingClassLoader) {
+                found = true;
+                break;
+            } else {
+                classLoader = classLoader.getParent();
+            }
         }
-        return classLoader;
+        return found ? classLoader : RemappingClassLoader.class.getClassLoader();
     }
 }

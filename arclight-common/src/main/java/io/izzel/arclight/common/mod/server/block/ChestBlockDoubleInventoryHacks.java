@@ -1,7 +1,6 @@
 package io.izzel.arclight.common.mod.server.block;
 
 import io.izzel.arclight.api.Unsafe;
-import io.izzel.arclight.common.mod.util.remapper.ArclightRemapper;
 import net.minecraft.world.CompoundContainer;
 
 import java.lang.reflect.Field;
@@ -13,8 +12,7 @@ public class ChestBlockDoubleInventoryHacks {
 
     static {
         try {
-            var className = ArclightRemapper.getNmsMapper().mapType("net/minecraft/world/level/block/BlockChest$2$1").replace('/', '.');
-            cl = Class.forName(className);
+            cl = Class.forName("net.minecraft.world.level.block.ChestBlock$2$1");
             Field field = cl.getDeclaredField("inventorylargechest");
             offset = Unsafe.objectFieldOffset(field);
         } catch (Exception e) {

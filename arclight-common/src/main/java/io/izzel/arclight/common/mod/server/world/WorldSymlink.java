@@ -1,6 +1,6 @@
 package io.izzel.arclight.common.mod.server.world;
 
-import io.izzel.arclight.common.mod.server.ArclightServer;
+import io.izzel.arclight.common.mod.ArclightMod;
 import org.bukkit.Bukkit;
 
 import java.io.File;
@@ -18,15 +18,15 @@ public class WorldSymlink {
         try {
             if (!Files.isSymbolicLink(source)) {
                 if (Files.exists(source)) {
-                    ArclightServer.LOGGER.warn("symlink-file-exist", source);
+                    ArclightMod.LOGGER.warn("symlink-file-exist", source);
                     return;
                 }
                 Files.createSymbolicLink(source, dest);
             }
         } catch (UnsupportedOperationException e) {
-            ArclightServer.LOGGER.warn("error-symlink", e);
+            ArclightMod.LOGGER.warn("error-symlink", e);
         } catch (IOException e) {
-            ArclightServer.LOGGER.error("Error creating symlink", e);
+            ArclightMod.LOGGER.error("Error creating symlink", e);
         }
     }
 }

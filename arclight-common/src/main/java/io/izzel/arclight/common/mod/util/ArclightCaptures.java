@@ -3,13 +3,13 @@ package io.izzel.arclight.common.mod.util;
 import io.izzel.arclight.common.mod.ArclightConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.server.WorldLoader;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.level.DataPackConfig;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.bukkit.TreeType;
 import org.bukkit.block.BlockState;
@@ -19,7 +19,6 @@ import org.bukkit.event.entity.EntityPotionEffectEvent;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Stack;
 
 public class ArclightCaptures {
@@ -66,13 +65,6 @@ public class ArclightCaptures {
         return null;
     }
 
-    public static boolean getBlockBreakDropItems() {
-        if (!blockBreakEventStack.empty()) {
-            return blockBreakEventStack.peek().isDropItems();
-        }
-        return true;
-    }
-
     public static BlockBreakEventContext popPrimaryBlockBreakEvent() {
         if (blockBreakEventStack.size() > 0) {
             BlockBreakEventContext eventContext = blockBreakEventStack.pop();
@@ -85,7 +77,7 @@ public class ArclightCaptures {
                 eventContext = blockBreakEventStack.pop();
             }
 
-            if (!unhandledEvents.isEmpty()) {
+            if (unhandledEvents.size() > 0) {
                 // ArclightMod.LOGGER.warn("Unhandled secondary block break event");
                 eventContext.mergeAllDrops(unhandledEvents);
             }
@@ -260,17 +252,17 @@ public class ArclightCaptures {
         }
     }
 
-    private static transient WorldLoader.DataLoadContext dataLoadContext;
+    private static transient DataPackConfig datapackCodec;
 
-    public static void captureDataLoadContext(WorldLoader.DataLoadContext context) {
-        dataLoadContext = context;
+    public static void captureDatapackConfig(DataPackConfig codec) {
+        datapackCodec = codec;
     }
 
-    public static WorldLoader.DataLoadContext getDataLoadContext() {
+    public static DataPackConfig getDatapackConfig() {
         try {
-            return Objects.requireNonNull(dataLoadContext, "dataLoadContext");
+            return datapackCodec;
         } finally {
-            dataLoadContext = null;
+            datapackCodec = null;
         }
     }
 
@@ -358,18 +350,16 @@ public class ArclightCaptures {
 
     public static class BlockBreakEventContext {
 
-        private final BlockBreakEvent blockBreakEvent;
-        private final ArrayList<ItemEntity> blockDrops;
-        private final BlockState blockBreakPlayerState;
-        private final boolean primary;
-        private final boolean dropItems;
+        final private BlockBreakEvent blockBreakEvent;
+        final private ArrayList<ItemEntity> blockDrops;
+        final private BlockState blockBreakPlayerState;
+        final private boolean primary;
 
         public BlockBreakEventContext(BlockBreakEvent event, boolean primary) {
             this.blockBreakEvent = event;
             this.blockDrops = new ArrayList<>();
             this.blockBreakPlayerState = event.getBlock().getState();
             this.primary = primary;
-            this.dropItems = event.isDropItems();
         }
 
         public BlockBreakEvent getEvent() {
@@ -378,10 +368,6 @@ public class ArclightCaptures {
 
         public ArrayList<ItemEntity> getBlockDrops() {
             return blockDrops;
-        }
-
-        public boolean isDropItems() {
-            return dropItems;
         }
 
         public BlockState getBlockBreakPlayerState() {
